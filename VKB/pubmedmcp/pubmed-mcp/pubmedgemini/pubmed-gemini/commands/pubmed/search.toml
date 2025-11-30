@@ -1,0 +1,16 @@
+prompt = """
+Please analyze this clinical question and provide a comprehensive evidence-based answer using the PubMed database.
+
+Clinical Question: {{args}}
+
+Use the enhanced_pubmed_search tool to find relevant research, then analyze the most trustworthy articles using the analyze_article_trustworthiness tool if needed.
+
+Provide:
+1. PICO framework breakdown
+2. Key findings from high-quality studies
+3. Evidence strength and quality assessment
+4. Clinical recommendations
+5. Research gaps and future directions
+
+Be specific about study designs, sample sizes, and statistical significance.
+"""
