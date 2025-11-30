@@ -1,0 +1,13 @@
+{
+  "name": "pubmed-gemini",
+  "version": "1.0.0",
+  "description": "PubMed MCP server for Gemini CLI - PhD-level medical research analysis",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "pubmed": {
+      "command": "node",
+      "args": ["${extensionPath}${/}pubmed-gemini${/}pubmed-wrapper.js"],
+      "cwd": "${extensionPath}"
+    }
+  }
+}
