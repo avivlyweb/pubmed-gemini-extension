@@ -1,0 +1,83 @@
+name: Release Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Create release archives
+        run: |
+          # Create generic archive
+          tar -czf pubmed-gemini-v${GITHUB_REF#refs/tags/v}.tar.gz \
+            --exclude='.git*' \
+            --exclude='node_modules' \
+            --exclude='.github' \
+            --exclude='*.md' \
+            --exclude='LICENSE' \
+            --exclude='.gitignore' \
+            pubmed-gemini/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            pubmed-gemini-v${GITHUB_REF#refs/tags/v}.tar.gz
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Test installation after release
+  test-install:
+    needs: release
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') }}
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Gemini CLI
+        run: |
+          curl -fsSL https://gcli.dev/install.sh | bash
+          export PATH="$HOME/.local/bin:$PATH"
+
+      - name: Test extension installation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          # Test installation from the repository
+          gemini extensions install https://github.com/${{ github.repository_owner }}/pubmed-gemini-extension --ref=${{ github.ref_name }}
+
+      - name: Verify extension
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          # Check if extension is installed
+          gemini extensions list | grep -q "pubmed-gemini" || exit 1
+          echo "✅ Extension installed successfully"
