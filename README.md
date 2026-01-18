@@ -154,5 +154,5 @@ MIT License - Free to use and modify.
 
 ---
 
-Made with love by **Aviv at [Avivly](https://avivly.com)**
+Made with love by **Aviv at [Avivly]([https://avivly.com](https://physiotherapy.ai/))**
 
