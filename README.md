@@ -52,7 +52,31 @@ Turn your Gemini CLI into a **professional medical research assistant** powered 
 
 ## 📦 **Installation**
 
-### **Quick Install (Recommended)**
+### **One-Command Install (No Coding Required!)**
+
+Just copy and paste ONE line into your terminal:
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.sh | bash
+```
+
+**Windows (PowerShell - Run as Administrator):**
+```powershell
+irm https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.ps1 | iex
+```
+
+**That's it!** The installer automatically handles everything:
+- ✅ Installs Node.js (if missing)
+- ✅ Installs Python 3.10+ (if missing)
+- ✅ Installs Homebrew on macOS (if missing)
+- ✅ Downloads the extension
+- ✅ Sets up all dependencies
+- ✅ Configures Gemini CLI
+
+> **Note:** The installer will ask for your password if it needs to install system packages.
+
+### **Alternative: Install via Gemini CLI**
 
 ```bash
 # Install directly from GitHub
@@ -65,15 +89,8 @@ gemini extensions install https://github.com/avivlyweb/pubmed-gemini-extension -
 ### **Requirements**
 - **Gemini CLI** installed ([download here](https://gcli.dev))
 - **Node.js** 18+ ([download here](https://nodejs.org))
-- **Python 3.8+** ([download here](https://python.org))
+- **Python 3.9+** ([download here](https://python.org))
 - **Internet connection** for PubMed API access
-
-### **Automatic Setup**
-The extension will automatically:
-- ✅ Download required Python dependencies
-- ✅ Setup virtual environment
-- ✅ Configure MCP server connection
-- ✅ Install custom commands
 
 ---
 

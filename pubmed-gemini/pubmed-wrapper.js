@@ -12,8 +12,9 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Path to the Python MCP server (go up to project root, then into pubmed-mcp directory)
-const pythonServerPath = join(__dirname, '..', '..', '..', 'pubmed-mcp', 'pubmed_mcp.py');
+// Path to the Python MCP server (sibling directory pubmed-mcp)
+const pythonServerPath = join(__dirname, '..', 'pubmed-mcp', 'pubmed_mcp.py');
+const mcpDir = join(__dirname, '..', 'pubmed-mcp');
 
 console.error('Starting PubMed MCP Server...');
 console.error(`Python server path: ${pythonServerPath}`);
@@ -21,10 +22,10 @@ console.error(`Python server path: ${pythonServerPath}`);
 // Spawn the Python process
 const pythonProcess = spawn('python3', [pythonServerPath], {
   stdio: ['pipe', 'pipe', 'pipe'],
-  cwd: join(__dirname, '..', '..', '..', 'pubmed-mcp'), // Set working directory to pubmed-mcp
+  cwd: mcpDir,
   env: {
     ...process.env,
-    PYTHONPATH: join(__dirname, '..', '..', '..', 'pubmed-mcp', 'clinical-ai-app', 'backend')
+    PYTHONPATH: mcpDir
   }
 });
 
