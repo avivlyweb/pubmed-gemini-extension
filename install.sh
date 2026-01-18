@@ -174,7 +174,7 @@ ensure_python() {
     done
     
     if [[ -n "$python_cmd" ]]; then
-        success "Python $($python_cmd --version | cut -d' ' -f2) already installed"
+        success "Python $($python_cmd --version | cut -d' ' -f2) already installed" >&2
         echo "$python_cmd"
         return 0
     fi
@@ -201,7 +201,7 @@ ensure_python() {
             ;;
     esac
     
-    success "Python $($python_cmd --version | cut -d' ' -f2) installed"
+    success "Python $($python_cmd --version | cut -d' ' -f2) installed" >&2
     echo "$python_cmd"
 }
 
