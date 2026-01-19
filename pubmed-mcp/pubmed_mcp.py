@@ -1162,6 +1162,534 @@ class TrustAnalyzer:
         return strengths[:4], limitations[:4]
 
 
+@dataclass
+class EvidenceCompassResult:
+    """Result from Evidence Compass analysis"""
+    verdict: str  # "Strong Support", "Moderate Support", "Mixed", "Moderate Against", "Strong Against"
+    verdict_score: int  # -100 to +100 (negative = against, positive = support)
+    raw_support_percent: int  # Simple % of studies supporting
+    weighted_support_percent: int  # Weighted by study quality
+    confidence_level: str  # "High", "Medium", "Low"
+    confidence_reasons: List[str]
+    total_studies: int
+    supporting_studies: int
+    opposing_studies: int
+    neutral_studies: int
+    grade_breakdown: Dict[str, Dict[str, int]]  # {"A": {"support": 2, "against": 0}, ...}
+    clinical_bottom_line: str
+
+
+class EvidenceCompass:
+    """
+    Evidence Compass - A weighted evidence analysis system.
+    
+    Unlike simple "consensus meters" that treat all studies equally,
+    Evidence Compass weights studies by:
+    - Evidence grade (A > B > C > D)
+    - Study design quality
+    - Sample size
+    - Recency
+    
+    Provides:
+    - Weighted verdict score
+    - Confidence level with reasons
+    - Breakdown by evidence grade
+    - Clinical bottom line summary
+    """
+    
+    # Weight multipliers for evidence grades
+    GRADE_WEIGHTS = {
+        "A": 4.0,  # Systematic reviews, meta-analyses
+        "B": 2.5,  # RCTs
+        "C": 1.5,  # Observational studies
+        "D": 0.5   # Case reports, low quality
+    }
+    
+    # Keywords indicating SUPPORT for the intervention/outcome
+    SUPPORT_KEYWORDS = [
+        # Positive outcomes
+        "effective", "efficacy", "beneficial", "benefit", "benefits",
+        "improved", "improvement", "improves", "improving",
+        "reduced", "reduction", "reduces", "reducing", "decrease", "decreased",
+        "significant improvement", "significantly improved",
+        "positive effect", "positive effects", "positive outcome",
+        "superior", "better than", "more effective",
+        "recommended", "supports", "supported", "favorable",
+        "successful", "success", "promising", "therapeutic effect",
+        "statistically significant", "clinically significant",
+        "safe and effective", "well-tolerated",
+        # For symptom reduction
+        "alleviate", "alleviates", "alleviated", "relief",
+        "remission", "resolved", "resolution"
+    ]
+    
+    # Keywords indicating OPPOSITION/no effect
+    OPPOSE_KEYWORDS = [
+        # Negative outcomes
+        "no effect", "no significant", "not effective", "ineffective",
+        "no difference", "no significant difference", "no benefit",
+        "did not improve", "failed to", "no improvement",
+        "not recommended", "insufficient evidence", "inconclusive",
+        "no association", "not associated", "negative", 
+        "harmful", "adverse", "worse", "worsened", "worsening",
+        "no change", "unchanged", "similar to placebo",
+        "not superior", "not better", "equivalent to placebo",
+        "lack of efficacy", "lack of effect",
+        # Caution words
+        "limited evidence", "weak evidence", "poor quality",
+        "high risk of bias", "conflicting results"
+    ]
+    
+    # Keywords indicating NEUTRAL/unclear
+    NEUTRAL_KEYWORDS = [
+        "mixed results", "mixed findings", "unclear", "uncertain",
+        "further research needed", "more studies needed",
+        "preliminary", "pilot study", "feasibility",
+        "comparable", "similar", "no superiority",
+        "modest effect", "small effect", "marginal"
+    ]
+    
+    def __init__(self, query: str):
+        """Initialize with the research query for context"""
+        self.query = query.lower()
+        self._extract_query_context()
+    
+    def _extract_query_context(self):
+        """Extract intervention and outcome from query for better sentiment matching"""
+        # Common intervention words to track
+        interventions = [
+            "yoga", "exercise", "meditation", "therapy", "treatment",
+            "vitamin", "supplement", "drug", "medication", "surgery",
+            "training", "program", "intervention", "diet"
+        ]
+        
+        # Find intervention in query
+        self.intervention = None
+        for interv in interventions:
+            if interv in self.query:
+                self.intervention = interv
+                break
+        
+        # Common outcomes/conditions to track
+        conditions = [
+            "anxiety", "depression", "pain", "stress", "sleep",
+            "walking", "mobility", "function", "quality of life",
+            "symptoms", "blood pressure", "glucose", "weight"
+        ]
+        
+        self.condition = None
+        for cond in conditions:
+            if cond in self.query:
+                self.condition = cond
+                break
+    
+    def _classify_article_stance(self, article: ArticleInfo, trust_score: TrustScore) -> str:
+        """
+        Classify an article's stance as 'support', 'against', or 'neutral'.
+        
+        Uses abstract text analysis with context from the query.
+        """
+        abstract_lower = article.abstract.lower()
+        title_lower = article.title.lower()
+        text = f"{title_lower} {abstract_lower}"
+        
+        # Count support and oppose signals
+        support_count = 0
+        oppose_count = 0
+        neutral_count = 0
+        
+        for keyword in self.SUPPORT_KEYWORDS:
+            if keyword in text:
+                support_count += 1
+                # Extra weight for keywords near our intervention/condition
+                if self.intervention and self.intervention in text:
+                    # Check if keyword is near intervention (within 100 chars)
+                    interv_pos = text.find(self.intervention)
+                    keyword_pos = text.find(keyword)
+                    if abs(interv_pos - keyword_pos) < 100:
+                        support_count += 1
+        
+        for keyword in self.OPPOSE_KEYWORDS:
+            if keyword in text:
+                oppose_count += 1
+        
+        for keyword in self.NEUTRAL_KEYWORDS:
+            if keyword in text:
+                neutral_count += 1
+        
+        # Check for conclusion patterns
+        conclusion_patterns = [
+            (r"conclusion[s]?:?\s*(.{50,200})", 2.0),  # Conclusions are weighted more
+            (r"in conclusion,?\s*(.{50,200})", 2.0),
+            (r"results:?\s*(.{50,200})", 1.5),
+            (r"findings:?\s*(.{50,200})", 1.5),
+        ]
+        
+        for pattern, weight in conclusion_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                conclusion_text = match.group(1)
+                for kw in self.SUPPORT_KEYWORDS[:10]:  # Top support keywords
+                    if kw in conclusion_text:
+                        support_count += weight
+                for kw in self.OPPOSE_KEYWORDS[:10]:
+                    if kw in conclusion_text:
+                        oppose_count += weight
+        
+        # Determine stance
+        total = support_count + oppose_count + neutral_count
+        if total == 0:
+            return "neutral"
+        
+        support_ratio = support_count / max(1, support_count + oppose_count)
+        
+        if support_ratio >= 0.65:
+            return "support"
+        elif support_ratio <= 0.35:
+            return "against"
+        else:
+            return "neutral"
+    
+    def _calculate_weighted_score(
+        self, 
+        articles: List[ArticleInfo], 
+        trust_scores: List[TrustScore],
+        stances: List[str]
+    ) -> Tuple[int, int]:
+        """
+        Calculate both raw and weighted support percentages.
+        
+        Returns: (raw_percent, weighted_percent)
+        """
+        if not articles:
+            return (0, 0)
+        
+        # Raw count
+        support_count = stances.count("support")
+        against_count = stances.count("against")
+        total_with_stance = support_count + against_count
+        
+        raw_percent = int(100 * support_count / max(1, total_with_stance))
+        
+        # Weighted calculation
+        weighted_support = 0.0
+        weighted_total = 0.0
+        
+        for trust, stance in zip(trust_scores, stances):
+            grade = trust.evidence_grade
+            weight = self.GRADE_WEIGHTS.get(grade, 1.0)
+            
+            # Also factor in the actual trust score
+            weight *= (trust.overall_score / 100.0)
+            
+            if stance == "support":
+                weighted_support += weight
+                weighted_total += weight
+            elif stance == "against":
+                weighted_total += weight
+            # Neutral doesn't count toward total
+        
+        weighted_percent = int(100 * weighted_support / max(0.1, weighted_total))
+        
+        return (raw_percent, weighted_percent)
+    
+    def _calculate_confidence(
+        self,
+        articles: List[ArticleInfo],
+        trust_scores: List[TrustScore],
+        stances: List[str]
+    ) -> Tuple[str, List[str]]:
+        """
+        Calculate confidence level with reasons.
+        
+        Returns: (level, [reasons])
+        """
+        reasons = []
+        score = 0  # 0-100 confidence score
+        
+        # Factor 1: Number of studies (more = higher confidence)
+        n = len(articles)
+        if n >= 10:
+            score += 30
+            reasons.append(f"{n} studies analyzed (sufficient volume)")
+        elif n >= 5:
+            score += 20
+            reasons.append(f"{n} studies analyzed (moderate volume)")
+        else:
+            score += 5
+            reasons.append(f"Only {n} studies (limited volume)")
+        
+        # Factor 2: Grade A/B studies
+        high_grade_count = sum(1 for t in trust_scores if t.evidence_grade in ["A", "B"])
+        if high_grade_count >= 3:
+            score += 30
+            reasons.append(f"{high_grade_count} high-quality studies (Grade A/B)")
+        elif high_grade_count >= 1:
+            score += 15
+            reasons.append(f"{high_grade_count} high-quality study (Grade A/B)")
+        else:
+            reasons.append("No high-quality studies (Grade A/B)")
+        
+        # Factor 3: Agreement among high-quality studies
+        high_grade_stances = [s for t, s in zip(trust_scores, stances) 
+                             if t.evidence_grade in ["A", "B"]]
+        if high_grade_stances:
+            support_in_high = high_grade_stances.count("support")
+            against_in_high = high_grade_stances.count("against")
+            if support_in_high > 0 and against_in_high == 0:
+                score += 25
+                reasons.append("High-quality studies agree (all support)")
+            elif against_in_high > 0 and support_in_high == 0:
+                score += 25
+                reasons.append("High-quality studies agree (all against)")
+            elif support_in_high > against_in_high:
+                score += 15
+                reasons.append("Majority of high-quality studies support")
+            elif against_in_high > support_in_high:
+                score += 15
+                reasons.append("Majority of high-quality studies oppose")
+            else:
+                score += 5
+                reasons.append("High-quality studies show mixed results")
+        
+        # Factor 4: Consistency across all studies
+        support_count = stances.count("support")
+        against_count = stances.count("against")
+        total = support_count + against_count
+        if total > 0:
+            consistency = max(support_count, against_count) / total
+            if consistency >= 0.8:
+                score += 15
+                reasons.append("Strong consistency across studies (>80% agree)")
+            elif consistency >= 0.6:
+                score += 10
+                reasons.append("Moderate consistency across studies")
+            else:
+                reasons.append("Low consistency (studies disagree)")
+        
+        # Determine level
+        if score >= 70:
+            level = "High"
+        elif score >= 40:
+            level = "Medium"
+        else:
+            level = "Low"
+        
+        return (level, reasons[:4])
+    
+    def _get_grade_breakdown(
+        self,
+        trust_scores: List[TrustScore],
+        stances: List[str]
+    ) -> Dict[str, Dict[str, int]]:
+        """Get breakdown of support/against by evidence grade."""
+        breakdown = {
+            "A": {"support": 0, "against": 0, "neutral": 0},
+            "B": {"support": 0, "against": 0, "neutral": 0},
+            "C": {"support": 0, "against": 0, "neutral": 0},
+            "D": {"support": 0, "against": 0, "neutral": 0}
+        }
+        
+        for trust, stance in zip(trust_scores, stances):
+            grade = trust.evidence_grade
+            if grade in breakdown:
+                breakdown[grade][stance] += 1
+        
+        return breakdown
+    
+    def _determine_verdict(self, weighted_percent: int, confidence: str) -> Tuple[str, int]:
+        """
+        Determine the verdict label and score.
+        
+        Returns: (verdict_label, verdict_score)
+        """
+        # Verdict score: -100 (strong against) to +100 (strong support)
+        # Map weighted_percent (0-100) to (-100 to +100)
+        verdict_score = (weighted_percent * 2) - 100
+        
+        # Adjust based on confidence
+        if confidence == "Low":
+            verdict_score = int(verdict_score * 0.7)  # Reduce certainty
+        
+        # Determine label
+        if verdict_score >= 60:
+            verdict = "Strong Support"
+        elif verdict_score >= 20:
+            verdict = "Moderate Support"
+        elif verdict_score >= -20:
+            verdict = "Mixed Evidence"
+        elif verdict_score >= -60:
+            verdict = "Moderate Against"
+        else:
+            verdict = "Strong Against"
+        
+        return (verdict, verdict_score)
+    
+    def _generate_bottom_line(
+        self,
+        verdict: str,
+        confidence: str,
+        grade_breakdown: Dict[str, Dict[str, int]],
+        weighted_percent: int
+    ) -> str:
+        """Generate a clinical bottom line summary."""
+        
+        # Count high-quality supporting studies
+        a_support = grade_breakdown["A"]["support"]
+        b_support = grade_breakdown["B"]["support"]
+        total_support = sum(g["support"] for g in grade_breakdown.values())
+        total_against = sum(g["against"] for g in grade_breakdown.values())
+        
+        if verdict == "Strong Support":
+            if a_support > 0:
+                return f"Strong evidence supports this intervention. {a_support} systematic review(s)/meta-analysis confirm benefit. Consider for clinical practice."
+            else:
+                return f"Good evidence supports this intervention. {total_support} studies show benefit. Consider for clinical practice with monitoring."
+        
+        elif verdict == "Moderate Support":
+            return f"Moderate evidence suggests benefit. {total_support} studies support vs {total_against} against. Consider patient preferences and individual factors."
+        
+        elif verdict == "Mixed Evidence":
+            return f"Evidence is mixed. Studies show conflicting results ({total_support} support, {total_against} against). Individual assessment recommended."
+        
+        elif verdict == "Moderate Against":
+            return f"Evidence suggests limited or no benefit. {total_against} studies found no effect. Consider alternative interventions."
+        
+        else:  # Strong Against
+            return f"Evidence does not support this intervention. {total_against} studies found no benefit or potential harm. Not recommended."
+    
+    def analyze(
+        self,
+        articles: List[ArticleInfo],
+        trust_scores: List[TrustScore]
+    ) -> EvidenceCompassResult:
+        """
+        Analyze articles and produce Evidence Compass result.
+        
+        Args:
+            articles: List of fetched articles
+            trust_scores: Corresponding trust scores
+            
+        Returns:
+            EvidenceCompassResult with full analysis
+        """
+        if not articles:
+            return EvidenceCompassResult(
+                verdict="Insufficient Evidence",
+                verdict_score=0,
+                raw_support_percent=0,
+                weighted_support_percent=0,
+                confidence_level="Low",
+                confidence_reasons=["No studies found"],
+                total_studies=0,
+                supporting_studies=0,
+                opposing_studies=0,
+                neutral_studies=0,
+                grade_breakdown={},
+                clinical_bottom_line="No evidence available. Try broadening your search."
+            )
+        
+        # Classify each article's stance
+        stances = [self._classify_article_stance(article, trust) 
+                   for article, trust in zip(articles, trust_scores)]
+        
+        # Calculate percentages
+        raw_percent, weighted_percent = self._calculate_weighted_score(
+            articles, trust_scores, stances
+        )
+        
+        # Calculate confidence
+        confidence_level, confidence_reasons = self._calculate_confidence(
+            articles, trust_scores, stances
+        )
+        
+        # Get grade breakdown
+        grade_breakdown = self._get_grade_breakdown(trust_scores, stances)
+        
+        # Determine verdict
+        verdict, verdict_score = self._determine_verdict(weighted_percent, confidence_level)
+        
+        # Generate bottom line
+        clinical_bottom_line = self._generate_bottom_line(
+            verdict, confidence_level, grade_breakdown, weighted_percent
+        )
+        
+        return EvidenceCompassResult(
+            verdict=verdict,
+            verdict_score=verdict_score,
+            raw_support_percent=raw_percent,
+            weighted_support_percent=weighted_percent,
+            confidence_level=confidence_level,
+            confidence_reasons=confidence_reasons,
+            total_studies=len(articles),
+            supporting_studies=stances.count("support"),
+            opposing_studies=stances.count("against"),
+            neutral_studies=stances.count("neutral"),
+            grade_breakdown=grade_breakdown,
+            clinical_bottom_line=clinical_bottom_line
+        )
+    
+    def format_ascii_display(self, result: EvidenceCompassResult) -> str:
+        """Format the result as an ASCII display for terminal output."""
+        
+        # Create progress bar
+        def make_bar(percent: int, width: int = 20) -> str:
+            filled = int(width * percent / 100)
+            return "█" * filled + "░" * (width - filled)
+        
+        support_bar = make_bar(result.weighted_support_percent)
+        against_bar = make_bar(100 - result.weighted_support_percent)
+        
+        # Build output
+        lines = [
+            "╔══════════════════════════════════════════════════════════════╗",
+            "║                     EVIDENCE COMPASS                          ║",
+            "╠══════════════════════════════════════════════════════════════╣",
+            f"║  Query: {self.query[:52]:<52} ║",
+            "║                                                              ║",
+            f"║  VERDICT: {result.verdict:<48} ║",
+            "║                                                              ║",
+            f"║  Support {support_bar} {result.weighted_support_percent:>3}% (weighted)      ║",
+            f"║  Against {against_bar} {100-result.weighted_support_percent:>3}%              ║",
+            "║                                                              ║",
+            f"║  Raw agreement: {result.raw_support_percent}% | Weighted: {result.weighted_support_percent}%                    ║",
+            "║                                                              ║",
+            "║  EVIDENCE BREAKDOWN                                          ║",
+            "║  ────────────────────                                        ║",
+        ]
+        
+        for grade in ["A", "B", "C", "D"]:
+            if grade in result.grade_breakdown:
+                b = result.grade_breakdown[grade]
+                if b["support"] + b["against"] + b["neutral"] > 0:
+                    lines.append(f"║    Grade {grade}: {b['support']} support, {b['against']} against, {b['neutral']} neutral          ║")
+        
+        lines.extend([
+            "║                                                              ║",
+            f"║  CONFIDENCE: {result.confidence_level:<46} ║",
+        ])
+        
+        for reason in result.confidence_reasons[:3]:
+            lines.append(f"║    • {reason:<54} ║")
+        
+        lines.extend([
+            "║                                                              ║",
+            "║  CLINICAL BOTTOM LINE:                                       ║",
+        ])
+        
+        # Word wrap the bottom line
+        bottom_line = result.clinical_bottom_line
+        while len(bottom_line) > 54:
+            lines.append(f"║    {bottom_line[:54]} ║")
+            bottom_line = bottom_line[54:]
+        if bottom_line:
+            lines.append(f"║    {bottom_line:<54} ║")
+        
+        lines.append("╚══════════════════════════════════════════════════════════════╝")
+        
+        return "\n".join(lines)
+
+
 class ResearchSynthesizer:
     """Generate comprehensive research summaries"""
     
@@ -1203,9 +1731,26 @@ class ResearchSynthesizer:
         recommendations = self._generate_recommendations(trust_scores)
         research_gaps = self._identify_research_gaps(trust_scores)
         
+        # Generate Evidence Compass analysis
+        compass = EvidenceCompass(query)
+        compass_result = compass.analyze(articles, trust_scores)
+        
         return {
             "query": query,
             "articles_analyzed": len(articles),
+            "evidence_compass": {
+                "verdict": compass_result.verdict,
+                "verdict_score": compass_result.verdict_score,
+                "raw_support_percent": compass_result.raw_support_percent,
+                "weighted_support_percent": compass_result.weighted_support_percent,
+                "confidence_level": compass_result.confidence_level,
+                "confidence_reasons": compass_result.confidence_reasons,
+                "supporting_studies": compass_result.supporting_studies,
+                "opposing_studies": compass_result.opposing_studies,
+                "neutral_studies": compass_result.neutral_studies,
+                "grade_breakdown": compass_result.grade_breakdown,
+                "clinical_bottom_line": compass_result.clinical_bottom_line
+            },
             "evidence_summary": evidence_summary,
             "synthesis": synthesis,
             "top_articles": [

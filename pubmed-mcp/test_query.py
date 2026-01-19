@@ -179,7 +179,44 @@ async def test_full_search():
     print(f"Query: {synthesis['query']}")
     print(f"Articles Analyzed: {synthesis['articles_analyzed']}")
     
+    # Display Evidence Compass
+    compass = synthesis.get('evidence_compass', {})
+    if compass:
+        print(f"\n{'='*80}")
+        print("EVIDENCE COMPASS")
+        print("-" * 40)
+        
+        # Create visual bar
+        weighted = compass.get('weighted_support_percent', 0)
+        bar_filled = int(20 * weighted / 100)
+        bar = "█" * bar_filled + "░" * (20 - bar_filled)
+        
+        print(f"\n  VERDICT: {compass.get('verdict', 'N/A')}")
+        print(f"\n  Support {bar} {weighted}% (weighted)")
+        print(f"  Against {'█' * (20-bar_filled) + '░' * bar_filled} {100-weighted}%")
+        print(f"\n  Raw agreement: {compass.get('raw_support_percent', 0)}% | Weighted: {weighted}%")
+        print(f"\n  Studies: {compass.get('supporting_studies', 0)} support, {compass.get('opposing_studies', 0)} against, {compass.get('neutral_studies', 0)} neutral")
+        
+        print(f"\n  EVIDENCE BREAKDOWN BY GRADE:")
+        breakdown = compass.get('grade_breakdown', {})
+        for grade in ['A', 'B', 'C', 'D']:
+            if grade in breakdown:
+                b = breakdown[grade]
+                total = b.get('support', 0) + b.get('against', 0) + b.get('neutral', 0)
+                if total > 0:
+                    print(f"    Grade {grade}: {b.get('support', 0)} support, {b.get('against', 0)} against")
+        
+        print(f"\n  CONFIDENCE: {compass.get('confidence_level', 'N/A')}")
+        for reason in compass.get('confidence_reasons', []):
+            print(f"    • {reason}")
+        
+        print(f"\n  CLINICAL BOTTOM LINE:")
+        print(f"    {compass.get('clinical_bottom_line', 'N/A')}")
+    
     evidence = synthesis.get('evidence_summary', {})
+    print(f"\n{'='*80}")
+    print("EVIDENCE SUMMARY")
+    print("-" * 40)
     print(f"Average Trust Score: {evidence.get('average_trust_score', 'N/A')}")
     print(f"Score Range: {evidence.get('score_range', 'N/A')}")
     print(f"Grade Distribution: {evidence.get('grade_distribution', {})}")
