@@ -1163,6 +1163,19 @@ class TrustAnalyzer:
 
 
 @dataclass
+class RecencyTrendResult:
+    """Result from recency and trend analysis"""
+    trend_direction: str  # "strengthening", "weakening", "stable", "insufficient_data"
+    trend_description: str
+    recent_support_percent: int  # Support % in studies from last 5 years
+    older_support_percent: int  # Support % in studies older than 5 years
+    recent_study_count: int
+    older_study_count: int
+    year_range: Tuple[int, int]  # (oldest_year, newest_year)
+    research_activity: str  # "active", "moderate", "limited"
+
+
+@dataclass
 class EvidenceCompassResult:
     """Result from Evidence Compass analysis"""
     verdict: str  # "Strong Support", "Moderate Support", "Mixed", "Moderate Against", "Strong Against"
@@ -1177,6 +1190,9 @@ class EvidenceCompassResult:
     neutral_studies: int
     grade_breakdown: Dict[str, Dict[str, int]]  # {"A": {"support": 2, "against": 0}, ...}
     clinical_bottom_line: str
+    # v2.2.0: New fields for recency/trend analysis
+    recency_trend: Optional[RecencyTrendResult] = None
+    sample_size_weighted_percent: Optional[int] = None  # Support % weighted by sample size
 
 
 class EvidenceCompass:
@@ -1558,6 +1574,141 @@ class EvidenceCompass:
         else:  # Strong Against
             return f"Evidence does not support this intervention. {total_against} studies found no benefit or potential harm. Not recommended."
     
+    def _extract_year(self, pub_date: str) -> Optional[int]:
+        """Extract year from publication date string."""
+        import re
+        # Try common formats: "2023", "Jan 2023", "2023 Jan 15", "2023-01-15"
+        year_match = re.search(r'\b(19|20)\d{2}\b', pub_date)
+        if year_match:
+            return int(year_match.group(0))
+        return None
+    
+    def _analyze_recency_trend(
+        self,
+        articles: List[ArticleInfo],
+        trust_scores: List[TrustScore],
+        stances: List[str]
+    ) -> RecencyTrendResult:
+        """
+        Analyze how evidence trends over time.
+        
+        Compares recent studies (last 5 years) vs older studies to see
+        if support is strengthening or weakening over time.
+        """
+        from datetime import datetime
+        current_year = datetime.now().year
+        cutoff_year = current_year - 5
+        
+        # Extract years and pair with stances
+        study_data = []
+        for article, stance in zip(articles, stances):
+            year = self._extract_year(article.pub_date)
+            if year:
+                study_data.append((year, stance))
+        
+        if len(study_data) < 2:
+            return RecencyTrendResult(
+                trend_direction="insufficient_data",
+                trend_description="Not enough dated studies to analyze trends",
+                recent_support_percent=0,
+                older_support_percent=0,
+                recent_study_count=0,
+                older_study_count=0,
+                year_range=(0, 0),
+                research_activity="limited"
+            )
+        
+        years = [y for y, _ in study_data]
+        year_range = (min(years), max(years))
+        
+        # Split into recent and older
+        recent = [(y, s) for y, s in study_data if y >= cutoff_year]
+        older = [(y, s) for y, s in study_data if y < cutoff_year]
+        
+        def calc_support_percent(data):
+            if not data:
+                return 0
+            support = sum(1 for _, s in data if s == "support")
+            against = sum(1 for _, s in data if s == "against")
+            total = support + against
+            return int(100 * support / max(1, total))
+        
+        recent_support = calc_support_percent(recent)
+        older_support = calc_support_percent(older)
+        
+        # Determine research activity
+        recent_count = len(recent)
+        if recent_count >= 5:
+            research_activity = "active"
+        elif recent_count >= 2:
+            research_activity = "moderate"
+        else:
+            research_activity = "limited"
+        
+        # Determine trend direction
+        diff = recent_support - older_support
+        
+        if len(older) == 0:
+            # All studies are recent
+            trend_direction = "stable"
+            trend_description = f"All {len(recent)} studies are from the past 5 years"
+        elif len(recent) == 0:
+            trend_direction = "insufficient_data"
+            trend_description = "No recent studies (past 5 years) available"
+        elif diff >= 20:
+            trend_direction = "strengthening"
+            trend_description = f"Support increasing: {older_support}% (before {cutoff_year}) → {recent_support}% (recent)"
+        elif diff <= -20:
+            trend_direction = "weakening"
+            trend_description = f"Support decreasing: {older_support}% (before {cutoff_year}) → {recent_support}% (recent)"
+        else:
+            trend_direction = "stable"
+            trend_description = f"Consistent evidence: {older_support}% (older) vs {recent_support}% (recent)"
+        
+        return RecencyTrendResult(
+            trend_direction=trend_direction,
+            trend_description=trend_description,
+            recent_support_percent=recent_support,
+            older_support_percent=older_support,
+            recent_study_count=len(recent),
+            older_study_count=len(older),
+            year_range=year_range,
+            research_activity=research_activity
+        )
+    
+    def _calculate_sample_size_weighted_score(
+        self,
+        trust_scores: List[TrustScore],
+        stances: List[str]
+    ) -> int:
+        """
+        Calculate support percentage weighted by sample size.
+        
+        Studies with larger sample sizes get more weight in the calculation.
+        """
+        if not trust_scores:
+            return 0
+        
+        weighted_support = 0.0
+        weighted_total = 0.0
+        
+        for trust, stance in zip(trust_scores, stances):
+            # Sample size score is 0-100, use it as a weight multiplier
+            # Add minimum weight of 0.5 so all studies count somewhat
+            weight = 0.5 + (trust.sample_size_score / 100.0)
+            
+            if stance == "support":
+                weighted_support += weight
+                weighted_total += weight
+            elif stance == "against":
+                weighted_total += weight
+            # Neutral studies don't count toward total
+        
+        if weighted_total < 0.1:
+            return 0
+        
+        return int(100 * weighted_support / weighted_total)
+    
     def analyze(
         self,
         articles: List[ArticleInfo],
@@ -1614,6 +1765,12 @@ class EvidenceCompass:
             verdict, confidence_level, grade_breakdown, weighted_percent
         )
         
+        # v2.2.0: Analyze recency trend
+        recency_trend = self._analyze_recency_trend(articles, trust_scores, stances)
+        
+        # v2.2.0: Calculate sample size weighted score
+        sample_size_weighted = self._calculate_sample_size_weighted_score(trust_scores, stances)
+        
         return EvidenceCompassResult(
             verdict=verdict,
             verdict_score=verdict_score,
@@ -1626,7 +1783,9 @@ class EvidenceCompass:
             opposing_studies=stances.count("against"),
             neutral_studies=stances.count("neutral"),
             grade_breakdown=grade_breakdown,
-            clinical_bottom_line=clinical_bottom_line
+            clinical_bottom_line=clinical_bottom_line,
+            recency_trend=recency_trend,
+            sample_size_weighted_percent=sample_size_weighted
         )
     
     def format_ascii_display(self, result: EvidenceCompassResult) -> str:
@@ -1671,6 +1830,28 @@ class EvidenceCompass:
         
         for reason in result.confidence_reasons[:3]:
             lines.append(f"║    • {reason:<54} ║")
+        
+        # v2.2.0: Add trend analysis section
+        if result.recency_trend and result.recency_trend.trend_direction != "insufficient_data":
+            trend = result.recency_trend
+            trend_icon = {"strengthening": "↑", "weakening": "↓", "stable": "→"}.get(trend.trend_direction, "?")
+            lines.extend([
+                "║                                                              ║",
+                "║  EVIDENCE TREND                                              ║",
+                "║  ──────────────────                                          ║",
+                f"║    {trend_icon} {trend.trend_description:<55} ║",
+                f"║    Studies: {trend.recent_study_count} recent, {trend.older_study_count} older ({trend.year_range[0]}-{trend.year_range[1]})          ║",
+                f"║    Research activity: {trend.research_activity:<36} ║",
+            ])
+        
+        # v2.2.0: Add sample size weighted score if different from quality-weighted
+        if result.sample_size_weighted_percent is not None:
+            diff = abs(result.sample_size_weighted_percent - result.weighted_support_percent)
+            if diff >= 5:  # Only show if meaningfully different
+                lines.extend([
+                    "║                                                              ║",
+                    f"║  Sample-size weighted: {result.sample_size_weighted_percent}% support                         ║",
+                ])
         
         lines.extend([
             "║                                                              ║",
@@ -1744,6 +1925,7 @@ class ResearchSynthesizer:
                 "verdict_score": compass_result.verdict_score,
                 "raw_support_percent": compass_result.raw_support_percent,
                 "weighted_support_percent": compass_result.weighted_support_percent,
+                "sample_size_weighted_percent": compass_result.sample_size_weighted_percent,
                 "confidence_level": compass_result.confidence_level,
                 "confidence_reasons": compass_result.confidence_reasons,
                 "supporting_studies": compass_result.supporting_studies,
@@ -1751,6 +1933,17 @@ class ResearchSynthesizer:
                 "neutral_studies": compass_result.neutral_studies,
                 "grade_breakdown": compass_result.grade_breakdown,
                 "clinical_bottom_line": compass_result.clinical_bottom_line,
+                # v2.2.0: Recency trend analysis
+                "recency_trend": {
+                    "direction": compass_result.recency_trend.trend_direction if compass_result.recency_trend else None,
+                    "description": compass_result.recency_trend.trend_description if compass_result.recency_trend else None,
+                    "recent_support_percent": compass_result.recency_trend.recent_support_percent if compass_result.recency_trend else None,
+                    "older_support_percent": compass_result.recency_trend.older_support_percent if compass_result.recency_trend else None,
+                    "recent_study_count": compass_result.recency_trend.recent_study_count if compass_result.recency_trend else None,
+                    "older_study_count": compass_result.recency_trend.older_study_count if compass_result.recency_trend else None,
+                    "year_range": list(compass_result.recency_trend.year_range) if compass_result.recency_trend else None,
+                    "research_activity": compass_result.recency_trend.research_activity if compass_result.recency_trend else None
+                } if compass_result.recency_trend else None,
                 "display": ascii_display
             },
             "evidence_summary": evidence_summary,

@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2025-01-19
+
+### Added
+
+#### Evidence Trend Analysis
+Understand how evidence is evolving over time:
+
+- **Recency Trend Detection**: Compare recent vs older study results
+  - `strengthening`: Support increasing over time (↑)
+  - `weakening`: Support decreasing over time (↓)
+  - `stable`: Consistent evidence across time periods (→)
+  - Shows recent support % vs older support %
+
+- **Research Activity Level**: How actively is this topic being researched?
+  - `active`: 5+ studies in the past 5 years
+  - `moderate`: 2-4 recent studies
+  - `limited`: 0-1 recent studies
+
+- **Sample Size Weighting**: Larger studies carry more weight
+  - Studies with bigger sample sizes contribute more to the verdict
+  - Shown separately from quality-weighted score when meaningfully different
+
+- **Enhanced ASCII Display**: New EVIDENCE TREND section
+  ```
+  ║  EVIDENCE TREND                                              ║
+  ║  ──────────────────                                          ║
+  ║    → All 5 studies are from the past 5 years                 ║
+  ║    Studies: 5 recent, 0 older (2022-2023)                    ║
+  ║    Research activity: active                                 ║
+  ```
+
+- **Year Range Tracking**: See the full span of evidence (oldest to newest)
+
+### Technical
+- Added `RecencyTrendResult` dataclass
+- Added `_extract_year()`, `_analyze_recency_trend()`, `_calculate_sample_size_weighted_score()` methods
+- Extended `EvidenceCompassResult` with `recency_trend` and `sample_size_weighted_percent` fields
+- Updated JSON output with full recency trend data
+
+---
+
 ## [2.1.0] - 2025-01-19
 
 ### Added
@@ -149,15 +190,10 @@ This project uses [Semantic Versioning](https://semver.org/):
 
 ## Upcoming Features
 
-### Planned for v2.2.0
-- **Recency Analysis**: Show if evidence is strengthening or weakening over time
-- **Sample Size Weighting**: Large studies count more
-- **Trend Detection**: "Evidence strengthening over time"
-- Citation export (BibTeX, RIS, EndNote)
-
 ### Planned for v2.3.0
 - **Contradiction Explainer**: Why do some studies disagree?
 - **Population Matching**: Flag when studies used different populations
+- Citation export (BibTeX, RIS, EndNote)
 - Integration with Cochrane Library
 
 ### Planned for v3.0.0
