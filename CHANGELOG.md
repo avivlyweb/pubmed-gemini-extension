@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2025-01-19
+
+### Added
+
+#### Evidence Compass - Weighted Evidence Analysis System
+
+A new feature that goes beyond simple "consensus meters" by weighting evidence by quality:
+
+- **Weighted Verdict Scoring**: Studies are weighted by evidence grade
+  - Grade A (Systematic Reviews): 4x weight
+  - Grade B (RCTs): 2.5x weight
+  - Grade C (Observational): 1.5x weight
+  - Grade D (Case Reports): 0.5x weight
+
+- **Verdict Types**:
+  - Strong Support (80-100% weighted)
+  - Moderate Support (60-79%)
+  - Mixed Evidence (40-59%)
+  - Moderate Against (20-39%)
+  - Strong Against (0-19%)
+
+- **Confidence Level Calculation**: High/Medium/Low with detailed reasons
+  - Based on number of studies
+  - Based on presence of Grade A/B studies
+  - Based on agreement among high-quality studies
+  - Based on overall consistency
+
+- **Grade Breakdown**: See exactly how studies voted by evidence quality
+  ```
+  Grade A: 3 support, 0 against
+  Grade B: 1 support, 0 against
+  ```
+
+- **Clinical Bottom Line**: Actionable summary for practice
+  - "Strong evidence supports this intervention..."
+  - "Consider for clinical practice..."
+
+- **Visual ASCII Display**: Progress bars for terminal output
+  ```
+  Support ████████████████████ 100% (weighted)
+  Against ░░░░░░░░░░░░░░░░░░░░ 0%
+  ```
+
+- **Sentiment Analysis**: Classifies each study as support/against/neutral
+  - Analyzes abstract and title text
+  - Weights conclusion sections more heavily
+  - Context-aware based on query terms
+
+### Technical
+- Added `EvidenceCompass` class (~400 lines)
+- Added `EvidenceCompassResult` dataclass
+- Integrated with `ResearchSynthesizer` for `/pubmed:synthesis` command
+- Updated test suite with Evidence Compass validation
+
+---
+
 ## [2.0.0] - 2025-01-19
 
 ### Added
@@ -93,17 +149,21 @@ This project uses [Semantic Versioning](https://semver.org/):
 
 ## Upcoming Features
 
-### Planned for v2.1.0
-- Citation export (BibTeX, RIS, EndNote)
-- Batch processing for multiple queries
-- Custom PICO pattern definitions
-- Search history and favorites
-
 ### Planned for v2.2.0
+- **Recency Analysis**: Show if evidence is strengthening or weakening over time
+- **Sample Size Weighting**: Large studies count more
+- **Trend Detection**: "Evidence strengthening over time"
+- Citation export (BibTeX, RIS, EndNote)
+
+### Planned for v2.3.0
+- **Contradiction Explainer**: Why do some studies disagree?
+- **Population Matching**: Flag when studies used different populations
 - Integration with Cochrane Library
+
+### Planned for v3.0.0
+- **Effect Size Extraction**: How big is the effect?
+- **NNT Calculator**: Number needed to treat
 - Multi-language abstract translation
-- Evidence synthesis across multiple queries
-- Research gap visualization
 
 ---
 
