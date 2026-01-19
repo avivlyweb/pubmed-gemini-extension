@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test script for PubMed MCP server query"""
+"""Test script for Enhanced PICO Extraction System"""
 
 import asyncio
 import sys
@@ -7,13 +7,112 @@ sys.path.insert(0, '.')
 
 from pubmed_mcp import PubMedClient, PICOExtractor, TrustAnalyzer, ResearchSynthesizer
 
-async def test_yoga_anxiety_query():
-    """Test the yoga/anxiety query"""
-    query = "In patients with anxiety, does yoga practice, improve clinical improvement and symptom reduction"
+# Test queries organized by complexity level
+TEST_QUERIES = [
+    # Level 1: Casual (General public - no specific medical conditions)
+    ("Is coffee bad for you?", 1, "Casual"),
+    ("What foods are healthy?", 1, "Casual"),
     
-    print(f"\n{'='*60}")
-    print(f"PUBMED RESEARCH QUERY TEST")
-    print(f"{'='*60}")
+    # Level 2: Clinical (Healthcare professionals/students - has medical conditions or interventions)
+    ("What helps with back pain?", 2, "Clinical"),  # back pain = medical condition
+    ("Does yoga help anxiety?", 2, "Clinical"),
+    ("Best exercises for COPD patients", 2, "Clinical"),
+    ("Vitamin D for bone health in elderly", 2, "Clinical"),
+    ("exercises to improve walking in copd patients", 2, "Clinical"),
+    
+    # Level 3: Research (PhD-level)
+    ("Effect of SSRI on HPA-axis in treatment-resistant depression", 3, "Research"),
+    ("Gut microbiome interventions for neonatal neuroinflammation", 3, "Research"),
+]
+
+
+def test_pico_extraction():
+    """Test PICO extraction for all query types"""
+    pico_extractor = PICOExtractor()
+    
+    print("\n" + "=" * 80)
+    print("ENHANCED PICO EXTRACTION TEST")
+    print("=" * 80)
+    
+    passed = 0
+    failed = 0
+    
+    for query, expected_level, expected_label in TEST_QUERIES:
+        print(f"\n{'='*80}")
+        print(f"Query: {query}")
+        print(f"Expected: Level {expected_level} ({expected_label})")
+        print("-" * 80)
+        
+        # Extract enhanced PICO
+        pico = pico_extractor.extract_enhanced(query)
+        
+        # Check if complexity detection is correct
+        level_match = pico.complexity_level == expected_level
+        
+        print(f"\nDetected Complexity: Level {pico.complexity_level} ({pico.complexity_label})")
+        print(f"Medical Domain: {pico.domain}")
+        print(f"Confidence Score: {pico.confidence_score}/100")
+        
+        print(f"\nPICO Components:")
+        print(f"  Population:   {pico.population}")
+        print(f"  Intervention: {pico.intervention}")
+        print(f"  Comparison:   {pico.comparison}")
+        print(f"  Outcome:      {pico.outcome}")
+        
+        print(f"\nClinical Question:")
+        print(f"  {pico.clinical_question}")
+        
+        print(f"\nOptimized Search Terms:")
+        print(f"  {pico.search_terms}")
+        
+        if pico.suggestions:
+            print(f"\nSuggestions to Improve Query:")
+            for i, suggestion in enumerate(pico.suggestions, 1):
+                print(f"  {i}. {suggestion}")
+        
+        # Validate results
+        status = "PASS" if level_match else "FAIL"
+        if level_match:
+            passed += 1
+        else:
+            failed += 1
+        
+        print(f"\nStatus: [{status}] - Complexity detection {'correct' if level_match else 'INCORRECT'}")
+        
+        # Additional validation for known patterns
+        query_lower = query.lower()
+        if "copd" in query_lower:
+            if "copd" in pico.population.lower() or "pulmonary" in pico.population.lower():
+                print("  [OK] COPD correctly identified in population")
+            else:
+                print("  [WARN] COPD should be in population")
+        
+        if "yoga" in query_lower:
+            if "yoga" in pico.intervention.lower():
+                print("  [OK] Yoga correctly identified as intervention")
+            else:
+                print("  [WARN] Yoga should be in intervention")
+        
+        if "anxiety" in query_lower:
+            if "anxiety" in pico.population.lower() or "anxiety" in pico.outcome.lower():
+                print("  [OK] Anxiety correctly identified")
+            else:
+                print("  [WARN] Anxiety should be in population or outcome")
+    
+    print(f"\n{'='*80}")
+    print(f"TEST SUMMARY: {passed} passed, {failed} failed out of {len(TEST_QUERIES)} tests")
+    print(f"{'='*80}\n")
+    
+    return passed, failed
+
+
+async def test_full_search():
+    """Test full search with one example query"""
+    query = "exercises to improve walking in copd patients"
+    
+    print(f"\n{'='*80}")
+    print(f"FULL SEARCH TEST")
+    print(f"{'='*80}")
     print(f"\nQuery: {query}\n")
     
     # Initialize components
@@ -22,18 +121,26 @@ async def test_yoga_anxiety_query():
     trust_analyzer = TrustAnalyzer()
     synthesizer = ResearchSynthesizer(pubmed_client, trust_analyzer)
     
-    # Extract PICO
-    print("PICO ANALYSIS")
+    # Extract enhanced PICO
+    print("ENHANCED PICO ANALYSIS")
     print("-" * 40)
-    pico = pico_extractor.extract(query)
+    pico = pico_extractor.extract_enhanced(query)
+    print(f"  Complexity:   Level {pico.complexity_level} ({pico.complexity_label})")
+    print(f"  Domain:       {pico.domain}")
+    print(f"  Confidence:   {pico.confidence_score}/100")
     print(f"  Population:   {pico.population}")
     print(f"  Intervention: {pico.intervention}")
     print(f"  Comparison:   {pico.comparison}")
     print(f"  Outcome:      {pico.outcome}")
     print(f"  Clinical Q:   {pico.clinical_question}")
     
+    if pico.suggestions:
+        print(f"\n  Suggestions:")
+        for s in pico.suggestions:
+            print(f"    - {s}")
+    
     # Search PubMed
-    print(f"\n{'='*60}")
+    print(f"\n{'='*80}")
     print("SEARCHING PUBMED...")
     print("-" * 40)
     
@@ -42,10 +149,11 @@ async def test_yoga_anxiety_query():
     
     if not pmids:
         print("No results found!")
+        await pubmed_client.close()
         return
     
     # Fetch and analyze articles
-    print(f"\n{'='*60}")
+    print(f"\n{'='*80}")
     print("ARTICLE ANALYSIS")
     print("-" * 40)
     
@@ -63,7 +171,7 @@ async def test_yoga_anxiety_query():
             print(f"   URL: https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/")
     
     # Generate synthesis
-    print(f"\n{'='*60}")
+    print(f"\n{'='*80}")
     print("RESEARCH SYNTHESIS")
     print("-" * 40)
     
@@ -87,9 +195,20 @@ async def test_yoga_anxiety_query():
     for gap in synthesis.get('research_gaps', []):
         print(f"  - {gap}")
     
-    print(f"\n{'='*60}")
-    print("TEST COMPLETED SUCCESSFULLY")
-    print(f"{'='*60}\n")
+    await pubmed_client.close()
+    
+    print(f"\n{'='*80}")
+    print("FULL SEARCH TEST COMPLETED SUCCESSFULLY")
+    print(f"{'='*80}\n")
+
 
 if __name__ == "__main__":
-    asyncio.run(test_yoga_anxiety_query())
+    # First run PICO extraction tests (fast, no API calls)
+    passed, failed = test_pico_extraction()
+    
+    # Then run full search test if extraction tests pass
+    if failed == 0:
+        print("\nAll PICO extraction tests passed! Running full search test...\n")
+        asyncio.run(test_full_search())
+    else:
+        print(f"\n{failed} PICO extraction tests failed. Fix issues before running full search.\n")

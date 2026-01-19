@@ -82,6 +82,22 @@ class PICOAnalysis:
 
 
 @dataclass
+class EnhancedPICOAnalysis:
+    """Enhanced PICO analysis with complexity level and suggestions"""
+    population: str
+    intervention: str
+    comparison: str
+    outcome: str
+    clinical_question: str
+    complexity_level: int  # 1=casual, 2=clinical, 3=research
+    complexity_label: str  # "Casual", "Clinical", "Research"
+    domain: str  # Medical domain detected
+    suggestions: List[str] = field(default_factory=list)  # Suggestions to improve the query
+    confidence_score: int = 50  # 0-100 confidence in extraction
+    search_terms: List[str] = field(default_factory=list)  # Optimized PubMed search terms
+
+
+@dataclass
 class TrustScore:
     """Article trustworthiness assessment"""
     overall_score: int
@@ -262,133 +278,698 @@ class PubMedClient:
 
 
 class PICOExtractor:
-    """Extract PICO components from clinical questions"""
+    """
+    Enhanced PICO extractor with 3-tier complexity detection.
     
-    POPULATION_KEYWORDS = [
-        "patient", "adult", "child", "elderly", "women", "men", "people with",
-        "individuals", "subjects", "participants", "diagnosed with"
+    Level 1 (Casual): General public questions like "Is coffee bad for you?"
+    Level 2 (Clinical): Healthcare professional questions like "Does yoga help anxiety?"
+    Level 3 (Research): PhD-level questions with specific biomarkers, populations, outcomes
+    """
+    
+    # ========== MEDICAL DOMAIN KEYWORDS ==========
+    MEDICAL_DOMAINS = {
+        "geriatric": [
+            "elderly", "older adult", "aging", "geriatric", "senior", "frail",
+            "aged", "nursing home", "dementia", "alzheimer", "fall prevention",
+            "sarcopenia", "osteoporosis", "polypharmacy", "65+", "over 65"
+        ],
+        "orthopedics": [
+            "bone", "joint", "fracture", "arthritis", "osteoarthritis", "spine",
+            "back pain", "knee", "hip", "shoulder", "musculoskeletal", "orthopedic",
+            "tendon", "ligament", "cartilage", "disc", "vertebra"
+        ],
+        "neurology": [
+            "brain", "neural", "neurological", "stroke", "parkinson", "multiple sclerosis",
+            "epilepsy", "seizure", "neuropathy", "cognitive", "dementia", "headache",
+            "migraine", "tremor", "spinal cord", "nerve", "neuroinflammation"
+        ],
+        "rehabilitation": [
+            "rehabilitation", "physiotherapy", "physical therapy", "occupational therapy",
+            "exercise", "mobility", "walking", "gait", "balance", "strength",
+            "functional", "recovery", "motor", "disability", "impairment"
+        ],
+        "cardiology": [
+            "heart", "cardiac", "cardiovascular", "hypertension", "blood pressure",
+            "arrhythmia", "coronary", "myocardial", "atrial", "ventricular",
+            "cholesterol", "lipid", "atherosclerosis"
+        ],
+        "pulmonology": [
+            "lung", "respiratory", "pulmonary", "copd", "asthma", "breathing",
+            "oxygen", "ventilation", "bronchitis", "pneumonia", "dyspnea"
+        ],
+        "psychiatry": [
+            "depression", "anxiety", "mental health", "psychiatric", "mood",
+            "bipolar", "schizophrenia", "ptsd", "stress", "psychological",
+            "antidepressant", "ssri", "psychotherapy"
+        ],
+        "oncology": [
+            "cancer", "tumor", "oncology", "chemotherapy", "radiation",
+            "carcinoma", "malignant", "metastasis", "neoplasm", "survival"
+        ],
+        "pediatrics": [
+            "child", "pediatric", "infant", "neonatal", "adolescent", "youth",
+            "developmental", "growth", "newborn", "toddler", "school-age"
+        ],
+        "endocrinology": [
+            "diabetes", "thyroid", "hormone", "insulin", "metabolic", "glucose",
+            "hba1c", "endocrine", "obesity", "weight", "bmi"
+        ]
+    }
+    
+    # ========== POPULATION PATTERNS ==========
+    POPULATION_PATTERNS = {
+        # Condition-based populations
+        "conditions": {
+            "copd": "Patients with chronic obstructive pulmonary disease (COPD)",
+            "diabetes": "Patients with diabetes mellitus",
+            "hypertension": "Patients with hypertension",
+            "heart disease": "Patients with cardiovascular disease",
+            "stroke": "Post-stroke patients",
+            "depression": "Patients with major depressive disorder",
+            "anxiety": "Patients with anxiety disorders",
+            "back pain": "Patients with chronic low back pain",
+            "arthritis": "Patients with arthritis",
+            "osteoarthritis": "Patients with osteoarthritis",
+            "cancer": "Cancer patients",
+            "parkinson": "Patients with Parkinson's disease",
+            "alzheimer": "Patients with Alzheimer's disease",
+            "dementia": "Patients with dementia",
+            "obesity": "Patients with obesity",
+            "asthma": "Patients with asthma",
+            "fibromyalgia": "Patients with fibromyalgia",
+            "multiple sclerosis": "Patients with multiple sclerosis",
+            "migraine": "Patients with migraine",
+            "insomnia": "Patients with insomnia",
+        },
+        # Age-based populations
+        "age_groups": {
+            "elderly": "Older adults (≥65 years)",
+            "older adult": "Older adults (≥65 years)",
+            "geriatric": "Geriatric population (≥65 years)",
+            "child": "Pediatric patients",
+            "pediatric": "Pediatric patients",
+            "infant": "Infants",
+            "neonatal": "Neonates",
+            "adolescent": "Adolescents",
+            "adult": "Adults (18-64 years)",
+            "young adult": "Young adults (18-35 years)",
+        },
+        # Gender-based
+        "gender": {
+            "women": "Female patients",
+            "men": "Male patients",
+            "pregnant": "Pregnant women",
+            "postmenopausal": "Postmenopausal women",
+        }
+    }
+    
+    # ========== INTERVENTION PATTERNS ==========
+    INTERVENTION_PATTERNS = {
+        # Exercise interventions
+        "exercise": {
+            "exercise": "Exercise therapy",
+            "walking": "Walking programs",
+            "aerobic": "Aerobic exercise",
+            "resistance training": "Resistance training",
+            "strength training": "Strength training",
+            "tai chi": "Tai Chi",
+            "yoga": "Yoga intervention",
+            "pilates": "Pilates",
+            "aquatic": "Aquatic exercise",
+            "cycling": "Cycling/stationary bike",
+        },
+        # Therapy interventions
+        "therapy": {
+            "physical therapy": "Physical therapy",
+            "physiotherapy": "Physiotherapy",
+            "occupational therapy": "Occupational therapy",
+            "cognitive behavioral therapy": "Cognitive behavioral therapy (CBT)",
+            "cbt": "Cognitive behavioral therapy (CBT)",
+            "psychotherapy": "Psychotherapy",
+            "speech therapy": "Speech therapy",
+            "massage": "Massage therapy",
+            "acupuncture": "Acupuncture",
+            "chiropractic": "Chiropractic care",
+        },
+        # Pharmacological
+        "pharmacological": {
+            "ssri": "Selective serotonin reuptake inhibitors (SSRIs)",
+            "antidepressant": "Antidepressant medications",
+            "statin": "Statin therapy",
+            "metformin": "Metformin",
+            "insulin": "Insulin therapy",
+            "ace inhibitor": "ACE inhibitors",
+            "beta blocker": "Beta blockers",
+            "nsaid": "NSAIDs",
+            "opioid": "Opioid analgesics",
+        },
+        # Supplements
+        "supplements": {
+            "vitamin d": "Vitamin D supplementation",
+            "vitamin": "Vitamin supplementation",
+            "omega-3": "Omega-3 fatty acids",
+            "fish oil": "Fish oil supplementation",
+            "probiotic": "Probiotic supplementation",
+            "calcium": "Calcium supplementation",
+            "iron": "Iron supplementation",
+            "magnesium": "Magnesium supplementation",
+        },
+        # Other interventions
+        "other": {
+            "meditation": "Meditation/mindfulness",
+            "mindfulness": "Mindfulness-based intervention",
+            "breathing": "Breathing exercises",
+            "diet": "Dietary intervention",
+            "education": "Patient education",
+            "telehealth": "Telehealth/telemedicine",
+            "surgery": "Surgical intervention",
+        }
+    }
+    
+    # ========== OUTCOME PATTERNS ==========
+    OUTCOME_PATTERNS = {
+        # Functional outcomes
+        "functional": {
+            "walking": "Walking ability/6-minute walk test",
+            "mobility": "Functional mobility",
+            "gait": "Gait parameters",
+            "balance": "Balance (Berg Balance Scale)",
+            "strength": "Muscle strength",
+            "function": "Functional capacity",
+            "adl": "Activities of daily living (ADL)",
+            "independence": "Functional independence",
+        },
+        # Symptom outcomes
+        "symptoms": {
+            "pain": "Pain intensity (VAS/NRS)",
+            "fatigue": "Fatigue levels",
+            "dyspnea": "Dyspnea/breathlessness",
+            "sleep": "Sleep quality",
+            "symptom": "Symptom severity",
+        },
+        # Mental health outcomes
+        "mental_health": {
+            "depression": "Depression symptoms (PHQ-9, BDI)",
+            "anxiety": "Anxiety symptoms (GAD-7, STAI)",
+            "quality of life": "Health-related quality of life",
+            "well-being": "Psychological well-being",
+            "stress": "Perceived stress",
+            "cognitive": "Cognitive function",
+        },
+        # Clinical outcomes
+        "clinical": {
+            "mortality": "All-cause mortality",
+            "survival": "Survival rate",
+            "hospitalization": "Hospital readmission",
+            "exacerbation": "Disease exacerbation",
+            "blood pressure": "Blood pressure control",
+            "hba1c": "Glycemic control (HbA1c)",
+            "bmi": "Body mass index",
+            "weight": "Weight change",
+        },
+        # Research-level outcomes
+        "biomarkers": {
+            "inflammatory": "Inflammatory markers (CRP, IL-6)",
+            "crp": "C-reactive protein",
+            "cytokine": "Cytokine levels",
+            "cortisol": "Cortisol levels",
+            "biomarker": "Biomarker changes",
+        }
+    }
+    
+    # ========== COMMON PICO PATTERNS ==========
+    # Known query patterns with pre-defined optimal PICO
+    COMMON_PATTERNS = {
+        # Yoga + anxiety is a common search
+        ("yoga", "anxiety"): {
+            "population": "Adults with anxiety disorders",
+            "intervention": "Yoga practice (various styles)",
+            "comparison": "Waitlist control, usual care, or active comparator",
+            "outcomes": ["Anxiety symptoms (GAD-7, STAI, HADS-A)", "Depression symptoms", "Quality of life", "Stress levels"],
+            "search_terms": ["yoga", "anxiety", "randomized controlled trial"]
+        },
+        ("exercise", "copd"): {
+            "population": "Patients with COPD (GOLD stages I-IV)",
+            "intervention": "Exercise training (aerobic, resistance, or combined)",
+            "comparison": "Usual care or no exercise",
+            "outcomes": ["6-minute walk distance", "Dyspnea (mMRC, Borg)", "Quality of life (SGRQ, CAT)", "Exercise capacity"],
+            "search_terms": ["exercise", "COPD", "pulmonary rehabilitation"]
+        },
+        ("walking", "copd"): {
+            "population": "Patients with COPD",
+            "intervention": "Walking-based exercise programs",
+            "comparison": "Standard care or sedentary control",
+            "outcomes": ["6-minute walk test", "Functional capacity", "Dyspnea", "Quality of life"],
+            "search_terms": ["walking", "COPD", "exercise", "pulmonary rehabilitation"]
+        },
+        ("vitamin d", "elderly"): {
+            "population": "Older adults (≥65 years)",
+            "intervention": "Vitamin D supplementation",
+            "comparison": "Placebo or no supplementation",
+            "outcomes": ["Bone mineral density", "Fall risk", "Fracture incidence", "Muscle strength"],
+            "search_terms": ["vitamin D", "elderly", "supplementation", "bone health"]
+        },
+        ("meditation", "stress"): {
+            "population": "Adults with elevated stress levels",
+            "intervention": "Meditation or mindfulness-based interventions",
+            "comparison": "Waitlist, attention control, or active comparator",
+            "outcomes": ["Perceived stress (PSS)", "Anxiety", "Cortisol levels", "Quality of life"],
+            "search_terms": ["meditation", "mindfulness", "stress", "randomized"]
+        },
+        ("physical therapy", "back pain"): {
+            "population": "Adults with chronic low back pain",
+            "intervention": "Physical therapy/physiotherapy",
+            "comparison": "Usual care, medication, or other interventions",
+            "outcomes": ["Pain intensity (VAS/NRS)", "Disability (ODI, RMDQ)", "Function", "Return to work"],
+            "search_terms": ["physical therapy", "low back pain", "chronic", "randomized"]
+        }
+    }
+    
+    # ========== COMPLEXITY INDICATORS ==========
+    RESEARCH_INDICATORS = [
+        # Biomarker terms
+        "biomarker", "cytokine", "interleukin", "inflammatory marker", "crp",
+        "hpa-axis", "cortisol", "epigenetic", "methylation", "transcriptomic",
+        "proteomic", "metabolomic", "microbiome", "gut-brain", "neuroinflammation",
+        # Research methodology terms
+        "randomized controlled", "systematic review", "meta-analysis", "cohort",
+        "prospective", "longitudinal", "dose-response", "mechanism", "pathway",
+        # Specific clinical terms
+        "treatment-resistant", "refractory", "phenotype", "genotype", "polymorphism",
+        "pharmacogenomic", "precision medicine", "targeted therapy"
     ]
     
-    INTERVENTION_KEYWORDS = [
-        "treatment", "therapy", "intervention", "drug", "medication", "surgery",
-        "exercise", "diet", "supplement", "program", "training"
+    CLINICAL_INDICATORS = [
+        # Professional terms
+        "patient", "treatment", "therapy", "clinical", "diagnosis", "prognosis",
+        "guideline", "protocol", "efficacy", "effectiveness", "safety",
+        # Specific conditions
+        "chronic", "acute", "moderate", "severe", "mild", "stage",
+        # Outcome measures
+        "mortality", "morbidity", "hospitalization", "readmission"
     ]
     
-    COMPARISON_KEYWORDS = [
-        "compared to", "versus", "vs", "or", "placebo", "control", "standard care",
-        "usual care", "alternative", "compared with"
-    ]
+    def __init__(self):
+        """Initialize the PICO extractor"""
+        self._compile_patterns()
     
-    OUTCOME_KEYWORDS = [
-        "effect", "outcome", "improve", "reduce", "increase", "decrease",
-        "mortality", "survival", "quality of life", "symptom", "pain", "function"
-    ]
+    def _compile_patterns(self):
+        """Pre-compile regex patterns for efficiency"""
+        # Patterns for extracting specific phrases
+        self.population_regex = re.compile(
+            r"(?:in|for|among|with)\s+([^,?.]+?)(?:\s+(?:does|do|is|are|can|could|should|what|how)|\s*[,?.]|$)",
+            re.IGNORECASE
+        )
+        self.intervention_regex = re.compile(
+            r"(?:does|do|is|are|can|could|effect of|effects of|impact of)\s+([^,?.]+?)(?:\s+(?:help|improve|reduce|prevent|treat|on|for|in)|\s*[,?.]|$)",
+            re.IGNORECASE
+        )
+        self.outcome_regex = re.compile(
+            r"(?:improve|reduce|prevent|treat|help with|effect on|impact on)\s+([^,?.]+?)(?:\s+(?:in|for|among)|\s*[,?.]|$)",
+            re.IGNORECASE
+        )
     
-    def extract(self, query: str) -> PICOAnalysis:
-        """Extract PICO components from a clinical question"""
+    def detect_complexity(self, query: str) -> Tuple[int, str]:
+        """
+        Detect the complexity level of the query.
+        
+        Returns:
+            Tuple of (level, label) where:
+            - Level 1: Casual (general public)
+            - Level 2: Clinical (healthcare professionals/students)
+            - Level 3: Research (PhD-level researchers)
+        """
         query_lower = query.lower()
         
-        population = self._extract_component(query_lower, self.POPULATION_KEYWORDS)
-        if not population:
-            population = self._infer_population(query_lower)
+        # Count research indicators
+        research_count = sum(1 for ind in self.RESEARCH_INDICATORS if ind in query_lower)
+        clinical_count = sum(1 for ind in self.CLINICAL_INDICATORS if ind in query_lower)
         
-        intervention = self._extract_component(query_lower, self.INTERVENTION_KEYWORDS)
-        if not intervention:
-            intervention = self._infer_intervention(query_lower)
+        # Check for research-level complexity
+        if research_count >= 2 or any(term in query_lower for term in 
+            ["mechanism", "pathway", "biomarker", "epigenetic", "microbiome", "transcriptomic"]):
+            return (3, "Research")
         
-        comparison = self._extract_comparison(query_lower)
+        # Check for clinical-level complexity
+        if clinical_count >= 2 or any(term in query_lower for term in 
+            ["patient", "treatment", "therapy", "clinical"]):
+            return (2, "Clinical")
         
-        outcome = self._extract_component(query_lower, self.OUTCOME_KEYWORDS)
-        if not outcome:
-            outcome = self._infer_outcome(query_lower)
+        # Check for medical conditions - these make a query clinical even with casual phrasing
+        clinical_conditions = [
+            "anxiety", "depression", "diabetes", "hypertension", "copd", "asthma",
+            "arthritis", "cancer", "stroke", "dementia", "parkinson", "alzheimer",
+            "heart disease", "obesity", "fibromyalgia", "migraine", "insomnia",
+            "chronic pain", "back pain", "osteoporosis", "multiple sclerosis"
+        ]
+        if any(condition in query_lower for condition in clinical_conditions):
+            return (2, "Clinical")
         
+        # Check for clinical interventions
+        clinical_interventions = [
+            "yoga", "exercise", "meditation", "physical therapy", "physiotherapy",
+            "acupuncture", "massage therapy", "cognitive behavioral", "vitamin",
+            "supplement", "medication", "drug", "surgery"
+        ]
+        if any(intervention in query_lower for intervention in clinical_interventions):
+            # If combined with a health-related question, it's clinical
+            if any(term in query_lower for term in ["help", "improve", "reduce", "treat", "prevent"]):
+                return (2, "Clinical")
+        
+        # Check query structure - simple questions WITHOUT medical terms are casual
+        casual_patterns = [
+            r"^is\s+\w+\s+(good|bad|safe|healthy)",
+            r"^what\s+(helps|is\s+good|works)\s+",
+            r"^does\s+\w+\s+(help|work)",
+            r"^can\s+\w+\s+help",
+            r"^should\s+i\s+",
+        ]
+        for pattern in casual_patterns:
+            if re.search(pattern, query_lower):
+                return (1, "Casual")
+        
+        # Default to clinical if unclear but has some medical terms
+        if any(domain_terms for domain_terms in self.MEDICAL_DOMAINS.values() 
+               if any(term in query_lower for term in domain_terms)):
+            return (2, "Clinical")
+        
+        return (1, "Casual")
+    
+    def detect_domain(self, query: str) -> str:
+        """Detect the primary medical domain of the query"""
+        query_lower = query.lower()
+        domain_scores = {}
+        
+        for domain, keywords in self.MEDICAL_DOMAINS.items():
+            score = sum(1 for kw in keywords if kw in query_lower)
+            if score > 0:
+                domain_scores[domain] = score
+        
+        if domain_scores:
+            return max(domain_scores, key=lambda d: domain_scores[d])
+        return "general"
+    
+    def _find_common_pattern(self, query: str) -> Optional[Dict[str, Any]]:
+        """Check if query matches a known common pattern"""
+        query_lower = query.lower()
+        
+        for (key1, key2), pattern_data in self.COMMON_PATTERNS.items():
+            if key1 in query_lower and key2 in query_lower:
+                return pattern_data
+        return None
+    
+    def _extract_population(self, query: str, complexity: int) -> str:
+        """Extract population from query based on complexity level"""
+        query_lower = query.lower()
+        
+        # First check condition-based populations
+        for condition, population in self.POPULATION_PATTERNS["conditions"].items():
+            if condition in query_lower:
+                return population
+        
+        # Check age groups
+        for age_term, population in self.POPULATION_PATTERNS["age_groups"].items():
+            if age_term in query_lower:
+                return population
+        
+        # Check gender
+        for gender_term, population in self.POPULATION_PATTERNS["gender"].items():
+            if gender_term in query_lower:
+                return population
+        
+        # Try regex extraction
+        match = self.population_regex.search(query)
+        if match:
+            extracted = match.group(1).strip()
+            # Clean up common words
+            extracted = re.sub(r"^(the|a|an)\s+", "", extracted)
+            if len(extracted) > 5 and len(extracted) < 100:
+                return f"Patients/individuals with {extracted}"
+        
+        # Default based on complexity
+        if complexity == 1:
+            return "General population"
+        elif complexity == 2:
+            return "Adult patients"
+        else:
+            return "Target population (specify patient characteristics)"
+    
+    def _extract_intervention(self, query: str, complexity: int) -> str:
+        """Extract intervention from query"""
+        query_lower = query.lower()
+        
+        # Check all intervention categories
+        for category, interventions in self.INTERVENTION_PATTERNS.items():
+            for keyword, intervention in interventions.items():
+                if keyword in query_lower:
+                    return intervention
+        
+        # Try regex extraction
+        match = self.intervention_regex.search(query)
+        if match:
+            extracted = match.group(1).strip()
+            if len(extracted) > 3 and len(extracted) < 80:
+                return extracted.title()
+        
+        # Default based on complexity
+        if complexity == 1:
+            return "Intervention of interest"
+        elif complexity == 2:
+            return "Treatment/therapy intervention"
+        else:
+            return "Specific intervention (define parameters, dosage, duration)"
+    
+    def _extract_comparison(self, query: str) -> str:
+        """Extract comparison from query"""
+        query_lower = query.lower()
+        
+        comparison_patterns = [
+            (r"compared to\s+([^,?.]+)", r"\1"),
+            (r"versus\s+([^,?.]+)", r"\1"),
+            (r"vs\.?\s+([^,?.]+)", r"\1"),
+            (r"or\s+([^,?.]+?)(?:\s+for|\s+in|\s*[,?.])", r"\1"),
+        ]
+        
+        for pattern, _ in comparison_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                comparison = match.group(1).strip()
+                if len(comparison) > 2 and len(comparison) < 50:
+                    return comparison.title()
+        
+        # Check for implicit comparisons
+        if "placebo" in query_lower:
+            return "Placebo"
+        if "control" in query_lower:
+            return "Control group"
+        if "standard care" in query_lower or "usual care" in query_lower:
+            return "Standard/usual care"
+        
+        return "Standard care, placebo, or no intervention"
+    
+    def _extract_outcome(self, query: str, complexity: int, domain: str) -> str:
+        """Extract outcome from query based on complexity and domain"""
+        query_lower = query.lower()
+        
+        # Check all outcome categories
+        for category, outcomes in self.OUTCOME_PATTERNS.items():
+            for keyword, outcome in outcomes.items():
+                if keyword in query_lower:
+                    return outcome
+        
+        # Try regex extraction
+        match = self.outcome_regex.search(query)
+        if match:
+            extracted = match.group(1).strip()
+            if len(extracted) > 3 and len(extracted) < 80:
+                return extracted.title()
+        
+        # Domain-specific default outcomes
+        domain_outcomes = {
+            "geriatric": "Functional status, falls, quality of life",
+            "orthopedics": "Pain, function, range of motion",
+            "neurology": "Cognitive function, motor function, symptom severity",
+            "rehabilitation": "Functional capacity, mobility, independence",
+            "cardiology": "Cardiovascular events, blood pressure, exercise capacity",
+            "pulmonology": "Respiratory function, dyspnea, exercise tolerance",
+            "psychiatry": "Symptom severity, quality of life, functioning",
+            "oncology": "Survival, tumor response, quality of life",
+            "pediatrics": "Growth, development, symptom control",
+            "endocrinology": "Metabolic control, weight, complications",
+        }
+        
+        if domain in domain_outcomes:
+            return domain_outcomes[domain]
+        
+        # Default based on complexity
+        if complexity == 1:
+            return "Health improvement"
+        elif complexity == 2:
+            return "Clinical outcomes and symptom improvement"
+        else:
+            return "Primary and secondary endpoints (specify measures)"
+    
+    def _generate_suggestions(self, query: str, complexity: int, 
+                             population: str, intervention: str, 
+                             comparison: str, outcome: str) -> List[str]:
+        """Generate suggestions to improve the PICO query"""
+        suggestions = []
+        query_lower = query.lower()
+        
+        # Population suggestions
+        if "general population" in population.lower() or "adult" in population.lower():
+            suggestions.append("Specify the population: age range, condition severity, comorbidities")
+        
+        # Intervention suggestions
+        if "intervention" in intervention.lower():
+            suggestions.append("Specify the intervention: type, dosage, frequency, duration")
+        
+        # Comparison suggestions
+        if "standard care" in comparison.lower() and "vs" not in query_lower and "versus" not in query_lower:
+            suggestions.append("Consider adding a comparison group: placebo, usual care, or alternative treatment")
+        
+        # Outcome suggestions
+        if complexity >= 2 and "clinical outcomes" in outcome.lower():
+            suggestions.append("Specify measurable outcomes: validated scales, biomarkers, time points")
+        
+        # Domain-specific suggestions
+        if "copd" in query_lower and "6-minute walk" not in query_lower:
+            suggestions.append("Consider including 6-minute walk test as an outcome measure")
+        if "anxiety" in query_lower and ("gad" not in query_lower and "stai" not in query_lower):
+            suggestions.append("Consider validated anxiety measures: GAD-7, STAI, HADS-A")
+        if "depression" in query_lower and ("phq" not in query_lower and "bdi" not in query_lower):
+            suggestions.append("Consider validated depression measures: PHQ-9, BDI, HADS-D")
+        
+        return suggestions[:4]  # Limit to 4 suggestions
+    
+    def _generate_search_terms(self, population: str, intervention: str, 
+                               outcome: str, domain: str) -> List[str]:
+        """Generate optimized PubMed search terms"""
+        terms = []
+        
+        # Extract key words from each component
+        def extract_key_words(text: str) -> List[str]:
+            # Remove common words
+            stopwords = {"patients", "with", "the", "a", "an", "of", "in", "for", "and", "or"}
+            words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
+            return [w for w in words if w not in stopwords][:3]
+        
+        terms.extend(extract_key_words(population))
+        terms.extend(extract_key_words(intervention))
+        terms.extend(extract_key_words(outcome))
+        
+        # Add study design terms for better results
+        terms.append("randomized controlled trial OR systematic review")
+        
+        return list(dict.fromkeys(terms))  # Remove duplicates while preserving order
+    
+    def _calculate_confidence(self, population: str, intervention: str, 
+                             outcome: str, common_pattern: bool) -> int:
+        """Calculate confidence score for the extraction"""
+        score = 50  # Base score
+        
+        if common_pattern:
+            score += 30
+        
+        # Higher confidence if specific terms found
+        if "general" not in population.lower():
+            score += 10
+        if "intervention of interest" not in intervention.lower():
+            score += 10
+        if "clinical outcomes" not in outcome.lower():
+            score += 10
+        
+        return min(100, score)
+    
+    def extract(self, query: str) -> PICOAnalysis:
+        """
+        Extract PICO components from a clinical question.
+        Returns basic PICOAnalysis for backward compatibility.
+        Use extract_enhanced() for full features.
+        """
+        enhanced = self.extract_enhanced(query)
+        return PICOAnalysis(
+            population=enhanced.population,
+            intervention=enhanced.intervention,
+            comparison=enhanced.comparison,
+            outcome=enhanced.outcome,
+            clinical_question=enhanced.clinical_question
+        )
+    
+    def extract_enhanced(self, query: str) -> EnhancedPICOAnalysis:
+        """
+        Extract PICO components with full enhanced features.
+        
+        Returns EnhancedPICOAnalysis with:
+        - Complexity level detection
+        - Domain identification
+        - Improvement suggestions
+        - Confidence score
+        - Optimized search terms
+        """
+        # Detect complexity and domain
+        complexity_level, complexity_label = self.detect_complexity(query)
+        domain = self.detect_domain(query)
+        
+        # Check for common patterns first
+        common_pattern = self._find_common_pattern(query)
+        
+        if common_pattern:
+            # Use pre-defined pattern
+            population = common_pattern["population"]
+            intervention = common_pattern["intervention"]
+            comparison = common_pattern["comparison"]
+            outcome = common_pattern["outcomes"][0] if common_pattern["outcomes"] else "Clinical outcomes"
+            search_terms = common_pattern["search_terms"]
+        else:
+            # Extract components
+            population = self._extract_population(query, complexity_level)
+            intervention = self._extract_intervention(query, complexity_level)
+            comparison = self._extract_comparison(query)
+            outcome = self._extract_outcome(query, complexity_level, domain)
+            search_terms = self._generate_search_terms(population, intervention, outcome, domain)
+        
+        # Generate suggestions
+        suggestions = self._generate_suggestions(
+            query, complexity_level, population, intervention, comparison, outcome
+        )
+        
+        # Calculate confidence
+        confidence = self._calculate_confidence(
+            population, intervention, outcome, common_pattern is not None
+        )
+        
+        # Generate clinical question
         clinical_question = self._generate_clinical_question(
             population, intervention, comparison, outcome
         )
         
-        return PICOAnalysis(
-            population=population or "General population",
-            intervention=intervention or "Intervention of interest",
-            comparison=comparison or "Standard care or placebo",
-            outcome=outcome or "Clinical outcomes",
-            clinical_question=clinical_question
+        return EnhancedPICOAnalysis(
+            population=population,
+            intervention=intervention,
+            comparison=comparison,
+            outcome=outcome,
+            clinical_question=clinical_question,
+            complexity_level=complexity_level,
+            complexity_label=complexity_label,
+            domain=domain.title() if domain != "general" else "General Medicine",
+            suggestions=suggestions,
+            confidence_score=confidence,
+            search_terms=search_terms
         )
     
-    def _extract_component(self, query: str, keywords: List[str]) -> Optional[str]:
-        for keyword in keywords:
-            if keyword in query:
-                idx = query.find(keyword)
-                start = max(0, idx - 30)
-                end = min(len(query), idx + len(keyword) + 50)
-                context = query[start:end].strip()
-                return context
-        return None
-    
-    def _extract_comparison(self, query: str) -> Optional[str]:
-        comparison_patterns = [
-            r"compared to\s+(\w+(?:\s+\w+)*)",
-            r"versus\s+(\w+(?:\s+\w+)*)",
-            r"vs\.?\s+(\w+(?:\s+\w+)*)",
-        ]
-        
-        for pattern in comparison_patterns:
-            match = re.search(pattern, query)
-            if match:
-                return match.group(1)[:50]
-        return None
-    
-    def _infer_population(self, query: str) -> str:
-        conditions = [
-            "diabetes", "hypertension", "cancer", "depression", "anxiety",
-            "arthritis", "asthma", "copd", "heart disease", "stroke",
-            "obesity", "back pain", "migraine", "insomnia"
-        ]
-        for condition in conditions:
-            if condition in query:
-                return f"Patients with {condition}"
-        return "Adults"
-    
-    def _infer_intervention(self, query: str) -> str:
-        interventions = [
-            ("exercise", "Exercise therapy"),
-            ("yoga", "Yoga practice"),
-            ("meditation", "Meditation/mindfulness"),
-            ("vitamin", "Vitamin supplementation"),
-            ("surgery", "Surgical intervention"),
-            ("physical therapy", "Physical therapy"),
-            ("cognitive", "Cognitive behavioral therapy"),
-            ("acupuncture", "Acupuncture"),
-            ("massage", "Massage therapy")
-        ]
-        for keyword, intervention in interventions:
-            if keyword in query:
-                return intervention
-        return "Treatment intervention"
-    
-    def _infer_outcome(self, query: str) -> str:
-        if any(word in query for word in ["help", "effective", "work", "benefit"]):
-            return "Clinical improvement and symptom reduction"
-        if "prevent" in query:
-            return "Prevention of disease/condition"
-        if "safe" in query:
-            return "Safety and adverse events"
-        return "Clinical outcomes"
-    
     def _generate_clinical_question(
-        self, population: Optional[str], intervention: Optional[str], 
-        comparison: Optional[str], outcome: Optional[str]
+        self, population: str, intervention: str, 
+        comparison: str, outcome: str
     ) -> str:
-        parts = []
-        if population:
-            parts.append(f"In {population.lower()}")
-        if intervention:
-            parts.append(f"does {intervention.lower()}")
-        if comparison:
-            parts.append(f"compared to {comparison.lower()}")
-        if outcome:
-            parts.append(f"improve {outcome.lower()}")
+        """Generate a well-formed clinical question"""
+        # Clean up components
+        pop = population.lower() if population else "adults"
+        interv = intervention.lower() if intervention else "the intervention"
+        comp = comparison.lower() if comparison else "standard care"
+        out = outcome.lower() if outcome else "clinical outcomes"
         
-        return ", ".join(parts) + "?" if parts else "Clinical question"
+        return f"In {pop}, does {interv} compared to {comp} improve {out}?"
 
 
 class TrustAnalyzer:
@@ -809,22 +1390,24 @@ class MCPServer:
         ]
     
     async def _handle_enhanced_search(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle enhanced PubMed search"""
+        """Handle enhanced PubMed search with tiered PICO analysis"""
         query = args.get("query", "")
         max_results = min(args.get("max_results", 10), 20)
         include_pico = args.get("include_pico", True)
         include_trust = args.get("include_trust_scores", True)
         
-        pico = self.pico_extractor.extract(query) if include_pico else None
+        # Use enhanced PICO extraction
+        enhanced_pico = self.pico_extractor.extract_enhanced(query) if include_pico else None
         pmids = await self.pubmed_client.search(query, max_results)
         
         if not pmids:
             return {
                 "query": query,
-                "pico_analysis": asdict(pico) if pico else None,
+                "pico_analysis": asdict(enhanced_pico) if enhanced_pico else None,
                 "results": [],
                 "total_found": 0,
-                "message": "No articles found. Try broader search terms."
+                "message": "No articles found. Try broader search terms.",
+                "suggestions": enhanced_pico.suggestions if enhanced_pico else []
             }
         
         results = []
@@ -850,13 +1433,23 @@ class MCPServer:
                 
                 results.append(result)
         
-        return {
+        response = {
             "query": query,
-            "optimized_question": pico.clinical_question if pico else query,
-            "pico_analysis": asdict(pico) if pico else None,
+            "optimized_question": enhanced_pico.clinical_question if enhanced_pico else query,
+            "pico_analysis": asdict(enhanced_pico) if enhanced_pico else None,
             "total_found": len(results),
             "results": results
         }
+        
+        # Add enhanced PICO features to response
+        if enhanced_pico:
+            response["complexity_level"] = enhanced_pico.complexity_label
+            response["medical_domain"] = enhanced_pico.domain
+            response["confidence_score"] = enhanced_pico.confidence_score
+            response["suggestions"] = enhanced_pico.suggestions
+            response["optimized_search_terms"] = enhanced_pico.search_terms
+        
+        return response
     
     async def _handle_analyze_trustworthiness(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Handle article trustworthiness analysis"""
