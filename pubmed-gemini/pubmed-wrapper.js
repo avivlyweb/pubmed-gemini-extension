@@ -12,15 +12,21 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Path to the Python MCP server (sibling directory pubmed-mcp)
-const pythonServerPath = join(__dirname, '..', 'pubmed-mcp', 'pubmed_mcp.py');
-const mcpDir = join(__dirname, '..', 'pubmed-mcp');
+// Path to the Python MCP server (in pubmed-mcp subdirectory)
+const mcpDir = join(__dirname, 'pubmed-mcp');
+const pythonServerPath = join(mcpDir, 'pubmed_mcp.py');
+const venvPython = join(mcpDir, 'venv', 'bin', 'python3');
 
 console.error('Starting PubMed MCP Server...');
 console.error(`Python server path: ${pythonServerPath}`);
 
+// Use venv python if available, otherwise system python3
+import { existsSync } from 'fs';
+const pythonCmd = existsSync(venvPython) ? venvPython : 'python3';
+console.error(`Using Python: ${pythonCmd}`);
+
 // Spawn the Python process
-const pythonProcess = spawn('python3', [pythonServerPath], {
+const pythonProcess = spawn(pythonCmd, [pythonServerPath], {
   stdio: ['pipe', 'pipe', 'pipe'],
   cwd: mcpDir,
   env: {
