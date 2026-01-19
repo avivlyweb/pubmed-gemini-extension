@@ -1734,6 +1734,7 @@ class ResearchSynthesizer:
         # Generate Evidence Compass analysis
         compass = EvidenceCompass(query)
         compass_result = compass.analyze(articles, trust_scores)
+        ascii_display = compass.format_ascii_display(compass_result)
         
         return {
             "query": query,
@@ -1749,7 +1750,8 @@ class ResearchSynthesizer:
                 "opposing_studies": compass_result.opposing_studies,
                 "neutral_studies": compass_result.neutral_studies,
                 "grade_breakdown": compass_result.grade_breakdown,
-                "clinical_bottom_line": compass_result.clinical_bottom_line
+                "clinical_bottom_line": compass_result.clinical_bottom_line,
+                "display": ascii_display
             },
             "evidence_summary": evidence_summary,
             "synthesis": synthesis,
@@ -1956,6 +1958,9 @@ class MCPServer:
             }
         
         results = []
+        articles_for_compass = []
+        trust_scores_for_compass = []
+        
         for pmid in pmids:
             article = await self.pubmed_client.fetch_article(pmid)
             if article:
@@ -1975,6 +1980,8 @@ class MCPServer:
                     result["trust_score"] = trust.overall_score
                     result["evidence_grade"] = trust.evidence_grade
                     result["study_design"] = trust.study_design
+                    articles_for_compass.append(article)
+                    trust_scores_for_compass.append(trust)
                 
                 results.append(result)
         
@@ -1993,6 +2000,21 @@ class MCPServer:
             response["confidence_score"] = enhanced_pico.confidence_score
             response["suggestions"] = enhanced_pico.suggestions
             response["optimized_search_terms"] = enhanced_pico.search_terms
+        
+        # Add Evidence Compass if we have trust scores
+        if include_trust and articles_for_compass:
+            compass = EvidenceCompass(query)
+            compass_result = compass.analyze(articles_for_compass, trust_scores_for_compass)
+            ascii_display = compass.format_ascii_display(compass_result)
+            response["evidence_compass"] = {
+                "verdict": compass_result.verdict,
+                "weighted_support_percent": compass_result.weighted_support_percent,
+                "confidence_level": compass_result.confidence_level,
+                "supporting_studies": compass_result.supporting_studies,
+                "opposing_studies": compass_result.opposing_studies,
+                "clinical_bottom_line": compass_result.clinical_bottom_line,
+                "display": ascii_display
+            }
         
         return response
     
