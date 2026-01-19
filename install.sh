@@ -264,13 +264,31 @@ configure_gemini() {
     # Create extensions directory
     mkdir -p "$HOME/.gemini/extensions"
     
-    # Create symlink
-    local link_path="$HOME/.gemini/extensions/pubmed-gemini"
-    [[ -L "$link_path" ]] && rm "$link_path"
-    [[ -d "$link_path" ]] && rm -rf "$link_path"
-    ln -sf "$INSTALL_DIR/pubmed-gemini" "$link_path"
+    local ext_path="$HOME/.gemini/extensions/pubmed-gemini"
     
-    success "Extension configured for Gemini CLI"
+    # Remove old installation (symlink or directory)
+    [[ -L "$ext_path" ]] && rm "$ext_path"
+    [[ -d "$ext_path" ]] && rm -rf "$ext_path"
+    
+    # Copy extension files (not symlink - so Gemini can detect updates)
+    cp -r "$INSTALL_DIR/pubmed-gemini" "$ext_path"
+    
+    # Copy MCP server into extension folder
+    cp -r "$INSTALL_DIR/pubmed-mcp" "$ext_path/"
+    
+    # Get current version from gemini-extension.json
+    local version=$(grep '"version"' "$ext_path/gemini-extension.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+    
+    # Create install metadata for Gemini CLI update detection
+    cat > "$ext_path/.gemini-extension-install.json" << METADATA
+{
+  "source": "https://github.com/avivlyweb/pubmed-gemini-extension",
+  "type": "github-release",
+  "releaseTag": "v${version}"
+}
+METADATA
+    
+    success "Extension configured for Gemini CLI (v${version})"
     
     # Check if Gemini CLI exists
     if ! cmd_exists gemini; then
@@ -318,7 +336,9 @@ print_success() {
     echo ""
     echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
     echo -e "  ${BOLD}Installation:${NC} $INSTALL_DIR"
-    echo -e "  ${BOLD}Uninstall:${NC}    rm -rf $INSTALL_DIR ~/.gemini/extensions/pubmed-gemini"
+    echo -e "  ${BOLD}Extension:${NC}    ~/.gemini/extensions/pubmed-gemini"
+    echo -e "  ${BOLD}Update:${NC}       Re-run this installer or use Gemini CLI"
+    echo -e "  ${BOLD}Uninstall:${NC}    $INSTALL_DIR/uninstall.sh"
     echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
     echo ""
     echo -e "${PURPLE}Happy researching! ${ROCKET}${NC}"
