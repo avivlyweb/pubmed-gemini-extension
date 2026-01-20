@@ -123,6 +123,267 @@ class ArticleInfo:
     doi: Optional[str]
     pub_types: List[str]
     mesh_terms: List[str]
+    # v2.4.0: New fields for full-text access
+    pmc_id: Optional[str] = None  # PubMed Central ID for free full text
+
+
+@dataclass
+class FullTextLinks:
+    """Full-text access links for an article (v2.4.0)"""
+    pubmed_url: str
+    doi_url: Optional[str] = None
+    pmc_url: Optional[str] = None
+    pmc_pdf_url: Optional[str] = None
+    open_access: bool = False
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary with only non-None values"""
+        result: Dict[str, Any] = {"pubmed": self.pubmed_url}
+        if self.doi_url:
+            result["doi"] = self.doi_url
+        if self.pmc_url:
+            result["pmc_fulltext"] = self.pmc_url
+        if self.pmc_pdf_url:
+            result["pmc_pdf"] = self.pmc_pdf_url
+        result["open_access"] = self.open_access
+        return result
+
+
+@dataclass 
+class StudySnapshot:
+    """2-sentence AI summary of a study (v2.4.0)"""
+    summary: str  # 2-sentence summary
+    key_finding: str  # "positive", "negative", "neutral", "mixed"
+    sample_size: Optional[int] = None
+    effect_description: Optional[str] = None  # e.g., "40% reduction", "significant improvement"
+
+
+class StudySnapshotGenerator:
+    """
+    Generate 2-sentence study snapshots from abstracts (v2.4.0).
+    
+    Extracts:
+    - Key methodology (what was done)
+    - Main finding (what was found)
+    - Direction of effect (positive/negative/neutral)
+    """
+    
+    # Patterns for extracting conclusions from structured abstracts
+    CONCLUSION_LABELS = [
+        "conclusion", "conclusions", "findings", "results", 
+        "main outcome", "main outcomes", "interpretation"
+    ]
+    
+    # Patterns indicating positive findings
+    POSITIVE_PATTERNS = [
+        r"significant(?:ly)?\s+(?:improved|reduced|decreased|increased|better|effective)",
+        r"(?:improved|reduced|decreased|increased)\s+significant",
+        r"effective\s+(?:in|for|at)",
+        r"beneficial\s+effect",
+        r"positive\s+(?:effect|outcome|result|impact)",
+        r"superior\s+to",
+        r"better\s+than",
+        r"recommended",
+        r"safe\s+and\s+effective",
+        r"well[\s-]tolerated",
+        r"statistically\s+significant\s+(?:improvement|reduction|benefit)",
+    ]
+    
+    # Patterns indicating negative/no effect findings
+    NEGATIVE_PATTERNS = [
+        r"no\s+significant\s+(?:difference|effect|improvement|change)",
+        r"not\s+(?:effective|significant|associated)",
+        r"failed\s+to\s+(?:show|demonstrate|improve)",
+        r"no\s+(?:effect|benefit|improvement|difference)",
+        r"similar\s+to\s+(?:placebo|control)",
+        r"did\s+not\s+(?:improve|reduce|show)",
+        r"insufficient\s+evidence",
+        r"inconclusive",
+        r"no\s+statistical(?:ly)?\s+significant",
+    ]
+    
+    # Patterns for extracting sample size
+    SAMPLE_SIZE_PATTERNS = [
+        r"(?:n\s*=\s*)(\d+)",
+        r"(\d+)\s*(?:patients|participants|subjects|individuals|adults|children)",
+        r"(?:sample\s+(?:size|of)\s*)(\d+)",
+        r"(?:total\s+of\s*)(\d+)",
+        r"(\d+)\s*(?:were\s+(?:enrolled|included|randomized))",
+    ]
+    
+    # Patterns for effect sizes/magnitudes
+    EFFECT_PATTERNS = [
+        r"(\d+(?:\.\d+)?)\s*%\s*(?:reduction|improvement|decrease|increase)",
+        r"(?:reduced|improved|decreased|increased)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*%",
+        r"(?:OR|RR|HR)\s*[=:]\s*(\d+(?:\.\d+)?)",
+        r"(?:effect\s+size|cohen['']?s?\s+d)\s*[=:]\s*(\d+(?:\.\d+)?)",
+        r"(\d+(?:\.\d+)?)\s*(?:times|fold)\s+(?:higher|lower|greater|more)",
+    ]
+    
+    def __init__(self):
+        self._compile_patterns()
+    
+    def _compile_patterns(self):
+        """Pre-compile regex patterns"""
+        self.positive_regex = [re.compile(p, re.IGNORECASE) for p in self.POSITIVE_PATTERNS]
+        self.negative_regex = [re.compile(p, re.IGNORECASE) for p in self.NEGATIVE_PATTERNS]
+        self.sample_regex = [re.compile(p, re.IGNORECASE) for p in self.SAMPLE_SIZE_PATTERNS]
+        self.effect_regex = [re.compile(p, re.IGNORECASE) for p in self.EFFECT_PATTERNS]
+    
+    def _extract_conclusion_section(self, abstract: str) -> str:
+        """Extract conclusion/results section from structured abstract."""
+        abstract_lower = abstract.lower()
+        
+        # Look for labeled sections
+        for label in self.CONCLUSION_LABELS:
+            # Pattern: "CONCLUSION: text" or "Conclusion: text"
+            pattern = rf"{label}s?\s*:\s*(.+?)(?:(?:\n[A-Z]+:)|$)"
+            match = re.search(pattern, abstract, re.IGNORECASE | re.DOTALL)
+            if match:
+                return match.group(1).strip()
+        
+        # If no labeled section, return last 2 sentences
+        sentences = self._split_sentences(abstract)
+        if len(sentences) >= 2:
+            return " ".join(sentences[-2:])
+        return abstract
+    
+    def _split_sentences(self, text: str) -> List[str]:
+        """Split text into sentences."""
+        # Simple sentence splitter
+        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+        return [s.strip() for s in sentences if s.strip()]
+    
+    def _determine_finding_direction(self, text: str) -> str:
+        """Determine if finding is positive, negative, or neutral."""
+        text_lower = text.lower()
+        
+        positive_count = sum(1 for regex in self.positive_regex if regex.search(text_lower))
+        negative_count = sum(1 for regex in self.negative_regex if regex.search(text_lower))
+        
+        if positive_count > negative_count:
+            return "positive"
+        elif negative_count > positive_count:
+            return "negative"
+        elif positive_count > 0 and negative_count > 0:
+            return "mixed"
+        else:
+            return "neutral"
+    
+    def _extract_sample_size(self, abstract: str) -> Optional[int]:
+        """Extract sample size from abstract."""
+        for regex in self.sample_regex:
+            matches = regex.findall(abstract)
+            if matches:
+                # Return the largest number found (often the total N)
+                try:
+                    numbers = [int(m) for m in matches if m.isdigit() or m.replace(',', '').isdigit()]
+                    if numbers:
+                        return max(numbers)
+                except ValueError:
+                    continue
+        return None
+    
+    def _extract_effect_description(self, text: str) -> Optional[str]:
+        """Extract effect size or magnitude description."""
+        for regex in self.effect_regex:
+            match = regex.search(text)
+            if match:
+                # Return the matched text with some context
+                start = max(0, match.start() - 20)
+                end = min(len(text), match.end() + 20)
+                snippet = text[start:end].strip()
+                # Clean up
+                if start > 0:
+                    snippet = "..." + snippet
+                if end < len(text):
+                    snippet = snippet + "..."
+                return snippet
+        return None
+    
+    def _generate_methodology_sentence(self, article: ArticleInfo) -> str:
+        """Generate first sentence describing the study methodology."""
+        # Determine study type
+        study_type = "study"
+        pub_types_lower = " ".join(article.pub_types).lower()
+        abstract_lower = article.abstract.lower()
+        
+        if "systematic review" in pub_types_lower or "meta-analysis" in pub_types_lower:
+            study_type = "systematic review"
+        elif "randomized" in pub_types_lower or "randomized" in abstract_lower:
+            study_type = "randomized controlled trial"
+        elif "cohort" in abstract_lower:
+            study_type = "cohort study"
+        elif "cross-sectional" in abstract_lower:
+            study_type = "cross-sectional study"
+        elif "case-control" in abstract_lower:
+            study_type = "case-control study"
+        
+        # Extract sample size
+        sample_size = self._extract_sample_size(article.abstract)
+        sample_str = f" with {sample_size} participants" if sample_size else ""
+        
+        # Get year
+        year_match = re.search(r"(\d{4})", article.pub_date)
+        year_str = f" ({year_match.group(1)})" if year_match else ""
+        
+        return f"This {study_type}{sample_str}{year_str} examined the research question."
+    
+    def _generate_finding_sentence(self, article: ArticleInfo) -> str:
+        """Generate second sentence describing the main finding."""
+        conclusion = self._extract_conclusion_section(article.abstract)
+        direction = self._determine_finding_direction(conclusion)
+        
+        # Get first meaningful sentence from conclusion
+        sentences = self._split_sentences(conclusion)
+        if sentences:
+            finding = sentences[0]
+            # Truncate if too long
+            if len(finding) > 200:
+                finding = finding[:197] + "..."
+            return finding
+        
+        # Fallback
+        direction_text = {
+            "positive": "showed beneficial effects",
+            "negative": "found no significant effect", 
+            "mixed": "showed mixed results",
+            "neutral": "reported findings requiring further investigation"
+        }
+        return f"The study {direction_text.get(direction, 'reported findings')}."
+    
+    def generate(self, article: ArticleInfo) -> StudySnapshot:
+        """Generate a 2-sentence snapshot for an article."""
+        if article.abstract == "No abstract available":
+            return StudySnapshot(
+                summary="No abstract available for this article. Please access the full text for details.",
+                key_finding="neutral",
+                sample_size=None,
+                effect_description=None
+            )
+        
+        # Generate methodology sentence (customized)
+        methodology = self._generate_methodology_sentence(article)
+        
+        # Generate finding sentence
+        finding = self._generate_finding_sentence(article)
+        
+        # Combine into snapshot
+        summary = f"{methodology} {finding}"
+        
+        # Determine overall direction
+        key_finding = self._determine_finding_direction(article.abstract)
+        
+        # Extract additional metadata
+        sample_size = self._extract_sample_size(article.abstract)
+        effect_desc = self._extract_effect_description(article.abstract)
+        
+        return StudySnapshot(
+            summary=summary,
+            key_finding=key_finding,
+            sample_size=sample_size,
+            effect_description=effect_desc
+        )
 
 
 class PubMedClient:
@@ -240,12 +501,15 @@ class PubMedClient:
                     abstract_parts.append(text)
             abstract = " ".join(abstract_parts) if abstract_parts else "No abstract available"
             
-            # Extract DOI
+            # Extract DOI and PMC ID
             doi = None
+            pmc_id = None
             for article_id in article.findall(".//ArticleId"):
-                if article_id.get("IdType") == "doi":
+                id_type = article_id.get("IdType")
+                if id_type == "doi" and article_id.text:
                     doi = article_id.text
-                    break
+                elif id_type == "pmc" and article_id.text:
+                    pmc_id = article_id.text
             
             # Extract publication types
             pub_types = []
@@ -268,13 +532,50 @@ class PubMedClient:
                 abstract=abstract,
                 doi=doi,
                 pub_types=pub_types,
-                mesh_terms=mesh_terms[:10]
+                mesh_terms=mesh_terms[:10],
+                pmc_id=pmc_id
             )
         except ET.ParseError:
             return None
     
     async def close(self):
         await self.client.aclose()
+
+
+def generate_full_text_links(article: ArticleInfo) -> FullTextLinks:
+    """
+    Generate full-text access links for an article (v2.4.0).
+    
+    Creates clickable URLs for:
+    - PubMed page
+    - DOI resolver (publisher page)
+    - PMC full text (if available)
+    - PMC PDF (if available)
+    """
+    pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/"
+    
+    doi_url = None
+    if article.doi:
+        doi_url = f"https://doi.org/{article.doi}"
+    
+    pmc_url = None
+    pmc_pdf_url = None
+    open_access = False
+    
+    if article.pmc_id:
+        # PMC articles are open access
+        open_access = True
+        pmc_id_clean = article.pmc_id.replace("PMC", "")
+        pmc_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmc_id_clean}/"
+        pmc_pdf_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmc_id_clean}/pdf/"
+    
+    return FullTextLinks(
+        pubmed_url=pubmed_url,
+        doi_url=doi_url,
+        pmc_url=pmc_url,
+        pmc_pdf_url=pmc_pdf_url,
+        open_access=open_access
+    )
 
 
 class PICOExtractor:
@@ -2176,6 +2477,7 @@ class ResearchSynthesizer:
     def __init__(self, client: PubMedClient, analyzer: TrustAnalyzer):
         self.client = client
         self.analyzer = analyzer
+        self.snapshot_generator = StudySnapshotGenerator()
     
     async def synthesize(self, query: str, max_articles: int = 10) -> Dict[str, Any]:
         pmids = await self.client.search(query, max_articles)
@@ -2250,9 +2552,15 @@ class ResearchSynthesizer:
                     "pmid": a.pmid,
                     "title": a.title,
                     "journal": a.journal,
+                    "pub_date": a.pub_date,
                     "trust_score": t.overall_score,
                     "evidence_grade": t.evidence_grade,
-                    "study_design": t.study_design
+                    "study_design": t.study_design,
+                    # v2.4.0: Study snapshot
+                    "snapshot": self.snapshot_generator.generate(a).summary,
+                    "finding_direction": self.snapshot_generator.generate(a).key_finding,
+                    # v2.4.0: Clickable full-text links
+                    "links": generate_full_text_links(a).to_dict()
                 }
                 for a, t in sorted(
                     zip(articles, trust_scores),
@@ -2343,6 +2651,7 @@ class MCPServer:
         self.trust_analyzer = TrustAnalyzer()
         self.synthesizer = ResearchSynthesizer(self.pubmed_client, self.trust_analyzer)
         self.citation_exporter = CitationExporter()
+        self.snapshot_generator = StudySnapshotGenerator()
         
         self.tools = {
             "enhanced_pubmed_search": self._handle_enhanced_search,
@@ -2490,6 +2799,12 @@ class MCPServer:
         for pmid in pmids:
             article = await self.pubmed_client.fetch_article(pmid)
             if article:
+                # Generate full-text links (v2.4.0)
+                links = generate_full_text_links(article)
+                
+                # Generate study snapshot (v2.4.0)
+                snapshot = self.snapshot_generator.generate(article)
+                
                 result = {
                     "pmid": article.pmid,
                     "title": article.title,
@@ -2497,8 +2812,12 @@ class MCPServer:
                     "journal": article.journal,
                     "pub_date": article.pub_date,
                     "abstract": article.abstract[:500] + "..." if len(article.abstract) > 500 else article.abstract,
-                    "doi": article.doi,
-                    "pubmed_url": f"https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/"
+                    # v2.4.0: Study snapshot - 2 sentence summary
+                    "snapshot": snapshot.summary,
+                    "finding_direction": snapshot.key_finding,
+                    "sample_size": snapshot.sample_size,
+                    # v2.4.0: Full-text links (clickable URLs)
+                    "links": links.to_dict(),
                 }
                 
                 if include_trust:
@@ -2695,7 +3014,7 @@ class MCPServer:
                     },
                     "serverInfo": {
                         "name": "pubmed-mcp",
-                        "version": "2.3.0"
+                        "version": "2.4.0"
                     }
                 }
             elif method == "notifications/initialized":
