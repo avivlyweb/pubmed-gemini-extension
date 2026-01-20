@@ -1162,6 +1162,305 @@ class TrustAnalyzer:
         return strengths[:4], limitations[:4]
 
 
+# ============================================================================
+# Citation Export (v2.3.0)
+# ============================================================================
+
+class CitationExporter:
+    """
+    Export PubMed articles to standard citation formats.
+    
+    Supports:
+    - BibTeX (.bib) - For LaTeX documents
+    - RIS (.ris) - Universal format for Zotero, Mendeley, EndNote
+    - EndNote Tagged (.enw) - For EndNote desktop
+    """
+    
+    SUPPORTED_FORMATS = ["bibtex", "ris", "endnote"]
+    
+    def __init__(self):
+        # Month name to number mapping
+        self.month_map = {
+            "jan": "01", "january": "01",
+            "feb": "02", "february": "02",
+            "mar": "03", "march": "03",
+            "apr": "04", "april": "04",
+            "may": "05",
+            "jun": "06", "june": "06",
+            "jul": "07", "july": "07",
+            "aug": "08", "august": "08",
+            "sep": "09", "september": "09",
+            "oct": "10", "october": "10",
+            "nov": "11", "november": "11",
+            "dec": "12", "december": "12"
+        }
+    
+    def _parse_pub_date(self, pub_date: str) -> Tuple[str, str]:
+        """Parse publication date into (year, month) tuple."""
+        year = ""
+        month = ""
+        
+        # Extract year
+        year_match = re.search(r"(\d{4})", pub_date)
+        if year_match:
+            year = year_match.group(1)
+        
+        # Extract month
+        for month_name, month_num in self.month_map.items():
+            if month_name in pub_date.lower():
+                month = month_num
+                break
+        
+        return year, month
+    
+    def _escape_bibtex(self, text: str) -> str:
+        """Escape special BibTeX characters."""
+        if not text:
+            return ""
+        # Replace special characters
+        replacements = [
+            ("&", r"\&"),
+            ("%", r"\%"),
+            ("$", r"\$"),
+            ("#", r"\#"),
+            ("_", r"\_"),
+            ("{", r"\{"),
+            ("}", r"\}"),
+            ("~", r"\textasciitilde{}"),
+            ("^", r"\textasciicircum{}"),
+        ]
+        result = text
+        for old, new in replacements:
+            result = result.replace(old, new)
+        return result
+    
+    def _format_bibtex_author(self, authors: List[str]) -> str:
+        """Format author list for BibTeX (Last, First and Last, First)."""
+        if not authors:
+            return ""
+        
+        formatted = []
+        for author in authors:
+            # Split "First Last" into "Last, First"
+            parts = author.strip().split()
+            if len(parts) >= 2:
+                formatted.append(f"{parts[-1]}, {' '.join(parts[:-1])}")
+            else:
+                formatted.append(author)
+        
+        return " and ".join(formatted)
+    
+    def to_bibtex(self, article: ArticleInfo) -> str:
+        """
+        Convert article to BibTeX format.
+        
+        Example output:
+        @article{pmid12345678,
+          author = {Smith, John and Doe, Jane},
+          title = {Title of the Article},
+          journal = {Journal Name},
+          year = {2024},
+          month = {jan},
+          pmid = {12345678},
+          doi = {10.1000/example}
+        }
+        """
+        year, month = self._parse_pub_date(article.pub_date)
+        
+        lines = [f"@article{{pmid{article.pmid},"]
+        
+        # Author
+        if article.authors:
+            author_str = self._format_bibtex_author(article.authors)
+            lines.append(f"  author = {{{self._escape_bibtex(author_str)}}},")
+        
+        # Title
+        lines.append(f"  title = {{{self._escape_bibtex(article.title)}}},")
+        
+        # Journal
+        lines.append(f"  journal = {{{self._escape_bibtex(article.journal)}}},")
+        
+        # Year
+        if year:
+            lines.append(f"  year = {{{year}}},")
+        
+        # Month (use abbreviated form)
+        if month:
+            month_abbr = {
+                "01": "jan", "02": "feb", "03": "mar", "04": "apr",
+                "05": "may", "06": "jun", "07": "jul", "08": "aug",
+                "09": "sep", "10": "oct", "11": "nov", "12": "dec"
+            }
+            lines.append(f"  month = {{{month_abbr.get(month, '')}}},")
+        
+        # PMID
+        lines.append(f"  pmid = {{{article.pmid}}},")
+        
+        # DOI
+        if article.doi:
+            lines.append(f"  doi = {{{article.doi}}},")
+        
+        # URL
+        lines.append(f"  url = {{https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/}}")
+        
+        lines.append("}")
+        
+        return "\n".join(lines)
+    
+    def to_ris(self, article: ArticleInfo) -> str:
+        """
+        Convert article to RIS format.
+        
+        RIS is widely supported by Zotero, Mendeley, EndNote, etc.
+        
+        Example output:
+        TY  - JOUR
+        AU  - Smith, John
+        AU  - Doe, Jane
+        TI  - Title of the Article
+        JO  - Journal Name
+        PY  - 2024
+        AN  - 12345678
+        DO  - 10.1000/example
+        UR  - https://pubmed.ncbi.nlm.nih.gov/12345678/
+        ER  - 
+        """
+        year, month = self._parse_pub_date(article.pub_date)
+        
+        lines = ["TY  - JOUR"]
+        
+        # Authors (one per line)
+        for author in article.authors:
+            lines.append(f"AU  - {author}")
+        
+        # Title
+        lines.append(f"TI  - {article.title}")
+        
+        # Journal
+        lines.append(f"JO  - {article.journal}")
+        
+        # Publication date
+        if year:
+            date_str = year
+            if month:
+                date_str = f"{year}/{month}"
+            lines.append(f"PY  - {date_str}")
+        
+        # Database accession number (PMID)
+        lines.append(f"AN  - {article.pmid}")
+        
+        # DOI
+        if article.doi:
+            lines.append(f"DO  - {article.doi}")
+        
+        # URL
+        lines.append(f"UR  - https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/")
+        
+        # Abstract (optional, can be long)
+        if article.abstract and article.abstract != "No abstract available":
+            # RIS allows multi-line abstracts with AB tag
+            lines.append(f"AB  - {article.abstract}")
+        
+        # Keywords (MeSH terms)
+        for term in article.mesh_terms[:10]:
+            lines.append(f"KW  - {term}")
+        
+        # End of record
+        lines.append("ER  - ")
+        
+        return "\n".join(lines)
+    
+    def to_endnote(self, article: ArticleInfo) -> str:
+        """
+        Convert article to EndNote Tagged format (.enw).
+        
+        Example output:
+        %0 Journal Article
+        %A Smith, John
+        %A Doe, Jane
+        %T Title of the Article
+        %J Journal Name
+        %D 2024
+        %M 12345678
+        %R 10.1000/example
+        %U https://pubmed.ncbi.nlm.nih.gov/12345678/
+        """
+        year, _ = self._parse_pub_date(article.pub_date)
+        
+        lines = ["%0 Journal Article"]
+        
+        # Authors (one per line)
+        for author in article.authors:
+            lines.append(f"%A {author}")
+        
+        # Title
+        lines.append(f"%T {article.title}")
+        
+        # Journal
+        lines.append(f"%J {article.journal}")
+        
+        # Year
+        if year:
+            lines.append(f"%D {year}")
+        
+        # Accession Number (PMID)
+        lines.append(f"%M {article.pmid}")
+        
+        # DOI
+        if article.doi:
+            lines.append(f"%R {article.doi}")
+        
+        # URL
+        lines.append(f"%U https://pubmed.ncbi.nlm.nih.gov/{article.pmid}/")
+        
+        # Abstract
+        if article.abstract and article.abstract != "No abstract available":
+            lines.append(f"%X {article.abstract}")
+        
+        # Keywords (MeSH terms)
+        for term in article.mesh_terms[:10]:
+            lines.append(f"%K {term}")
+        
+        # End with blank line
+        lines.append("")
+        
+        return "\n".join(lines)
+    
+    def export(self, article: ArticleInfo, format: str) -> str:
+        """Export a single article to the specified format."""
+        format_lower = format.lower().strip()
+        
+        if format_lower == "bibtex" or format_lower == "bib":
+            return self.to_bibtex(article)
+        elif format_lower == "ris":
+            return self.to_ris(article)
+        elif format_lower == "endnote" or format_lower == "enw":
+            return self.to_endnote(article)
+        else:
+            raise ValueError(f"Unsupported format: {format}. Supported: {self.SUPPORTED_FORMATS}")
+    
+    def export_multiple(self, articles: List[ArticleInfo], format: str) -> str:
+        """Export multiple articles to the specified format."""
+        format_lower = format.lower().strip()
+        
+        if not articles:
+            return ""
+        
+        exports = []
+        for article in articles:
+            exports.append(self.export(article, format_lower))
+        
+        # Different formats have different separators
+        if format_lower == "bibtex" or format_lower == "bib":
+            return "\n\n".join(exports)
+        elif format_lower == "ris":
+            return "\n".join(exports)
+        elif format_lower == "endnote" or format_lower == "enw":
+            return "\n".join(exports)
+        else:
+            return "\n\n".join(exports)
+
+
 @dataclass
 class RecencyTrendResult:
     """Result from recency and trend analysis"""
@@ -2043,11 +2342,13 @@ class MCPServer:
         self.pico_extractor = PICOExtractor()
         self.trust_analyzer = TrustAnalyzer()
         self.synthesizer = ResearchSynthesizer(self.pubmed_client, self.trust_analyzer)
+        self.citation_exporter = CitationExporter()
         
         self.tools = {
             "enhanced_pubmed_search": self._handle_enhanced_search,
             "analyze_article_trustworthiness": self._handle_analyze_trustworthiness,
             "generate_research_summary": self._handle_research_summary,
+            "export_citations": self._handle_export_citations,
         }
     
     def get_tools_list(self) -> List[Dict[str, Any]]:
@@ -2123,6 +2424,40 @@ class MCPServer:
                         }
                     },
                     "required": ["query"]
+                }
+            },
+            {
+                "name": "export_citations",
+                "description": (
+                    "Export PubMed articles to standard citation formats for reference managers. "
+                    "Supports BibTeX (LaTeX), RIS (Zotero/Mendeley), and EndNote formats. "
+                    "Provide either PMIDs or a search query."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "pmids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of PubMed IDs to export (e.g., ['12345678', '87654321'])"
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": "Search query to find articles to export (alternative to pmids)"
+                        },
+                        "format": {
+                            "type": "string",
+                            "enum": ["bibtex", "ris", "endnote"],
+                            "description": "Citation format: 'bibtex' for LaTeX, 'ris' for Zotero/Mendeley, 'endnote' for EndNote",
+                            "default": "bibtex"
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Max articles to export when using query (default: 10, max: 50)",
+                            "default": 10
+                        }
+                    },
+                    "required": ["format"]
                 }
             }
         ]
@@ -2269,6 +2604,82 @@ class MCPServer:
         
         return synthesis
     
+    async def _handle_export_citations(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle citation export to BibTeX, RIS, or EndNote format."""
+        pmids = args.get("pmids", [])
+        query = args.get("query", "")
+        format_type = args.get("format", "bibtex").lower()
+        max_results = min(args.get("max_results", 10), 50)
+        
+        # Validate format
+        if format_type not in CitationExporter.SUPPORTED_FORMATS and format_type not in ["bib", "enw"]:
+            return {
+                "error": f"Unsupported format: {format_type}",
+                "supported_formats": CitationExporter.SUPPORTED_FORMATS,
+                "hint": "Use 'bibtex' for LaTeX, 'ris' for Zotero/Mendeley, 'endnote' for EndNote"
+            }
+        
+        # Need either PMIDs or a query
+        if not pmids and not query:
+            return {
+                "error": "Either 'pmids' or 'query' is required",
+                "example_pmids": ["12345678", "87654321"],
+                "example_query": "yoga anxiety randomized controlled trial"
+            }
+        
+        # If query provided, search for PMIDs first
+        if query and not pmids:
+            pmids = await self.pubmed_client.search(query, max_results)
+            if not pmids:
+                return {
+                    "error": f"No articles found for query: {query}",
+                    "suggestion": "Try broader search terms or check spelling"
+                }
+        
+        # Fetch articles
+        articles = []
+        failed_pmids = []
+        
+        for pmid in pmids:
+            pmid_str = str(pmid).strip()
+            article = await self.pubmed_client.fetch_article(pmid_str)
+            if article:
+                articles.append(article)
+            else:
+                failed_pmids.append(pmid_str)
+        
+        if not articles:
+            return {
+                "error": "Could not fetch any articles",
+                "failed_pmids": failed_pmids
+            }
+        
+        # Export to requested format
+        try:
+            exported = self.citation_exporter.export_multiple(articles, format_type)
+        except ValueError as e:
+            return {"error": str(e)}
+        
+        # Format-specific file extension hints
+        extensions = {
+            "bibtex": ".bib",
+            "bib": ".bib",
+            "ris": ".ris",
+            "endnote": ".enw",
+            "enw": ".enw"
+        }
+        
+        return {
+            "format": format_type,
+            "file_extension": extensions.get(format_type, ".txt"),
+            "articles_exported": len(articles),
+            "failed_pmids": failed_pmids if failed_pmids else None,
+            "query": query if query else None,
+            "exported_pmids": [a.pmid for a in articles],
+            "citations": exported,
+            "usage_hint": f"Copy the 'citations' content and save to a file with {extensions.get(format_type, '.txt')} extension"
+        }
+    
     async def handle_request(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle incoming JSON-RPC request"""
         method = request.get("method", "")
@@ -2284,7 +2695,7 @@ class MCPServer:
                     },
                     "serverInfo": {
                         "name": "pubmed-mcp",
-                        "version": "1.0.0"
+                        "version": "2.3.0"
                     }
                 }
             elif method == "notifications/initialized":

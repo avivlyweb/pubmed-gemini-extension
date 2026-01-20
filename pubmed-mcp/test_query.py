@@ -5,7 +5,7 @@ import asyncio
 import sys
 sys.path.insert(0, '.')
 
-from pubmed_mcp import PubMedClient, PICOExtractor, TrustAnalyzer, ResearchSynthesizer
+from pubmed_mcp import PubMedClient, PICOExtractor, TrustAnalyzer, ResearchSynthesizer, CitationExporter, ArticleInfo
 
 # Test queries organized by complexity level
 TEST_QUERIES = [
@@ -239,13 +239,162 @@ async def test_full_search():
     print(f"{'='*80}\n")
 
 
+def test_citation_export():
+    """Test citation export to all formats"""
+    print(f"\n{'='*80}")
+    print("CITATION EXPORT TEST")
+    print(f"{'='*80}")
+    
+    exporter = CitationExporter()
+    
+    # Create a mock article for testing
+    mock_article = ArticleInfo(
+        pmid="12345678",
+        title="Effects of Yoga on Anxiety: A Randomized Controlled Trial",
+        authors=["John Smith", "Jane Doe", "Robert Johnson"],
+        journal="Journal of Clinical Medicine",
+        pub_date="Jan 2024",
+        abstract="Background: Anxiety disorders are common. Methods: We randomized 100 participants. Results: Yoga reduced anxiety significantly (p<0.001). Conclusion: Yoga is effective for anxiety.",
+        doi="10.1234/jcm.2024.0001",
+        pub_types=["Randomized Controlled Trial"],
+        mesh_terms=["Anxiety", "Yoga", "Adult", "Treatment Outcome"]
+    )
+    
+    print("\n" + "-"*40)
+    print("TEST 1: BibTeX Export")
+    print("-"*40)
+    bibtex = exporter.to_bibtex(mock_article)
+    print(bibtex)
+    
+    # Validate BibTeX
+    assert "@article{pmid12345678," in bibtex, "BibTeX should have correct entry type"
+    assert "author = {Smith, John and Doe, Jane and Johnson, Robert}" in bibtex, "Authors should be formatted correctly"
+    assert "year = {2024}" in bibtex, "Year should be extracted"
+    assert "doi = {10.1234/jcm.2024.0001}" in bibtex, "DOI should be included"
+    print("\n[PASS] BibTeX export valid")
+    
+    print("\n" + "-"*40)
+    print("TEST 2: RIS Export")
+    print("-"*40)
+    ris = exporter.to_ris(mock_article)
+    print(ris)
+    
+    # Validate RIS
+    assert "TY  - JOUR" in ris, "RIS should have journal type"
+    assert "AU  - John Smith" in ris, "Authors should be on separate lines"
+    assert "TI  - Effects of Yoga on Anxiety" in ris, "Title should be included"
+    assert "DO  - 10.1234/jcm.2024.0001" in ris, "DOI should be included"
+    assert "ER  - " in ris, "RIS should have end marker"
+    print("\n[PASS] RIS export valid")
+    
+    print("\n" + "-"*40)
+    print("TEST 3: EndNote Export")
+    print("-"*40)
+    endnote = exporter.to_endnote(mock_article)
+    print(endnote)
+    
+    # Validate EndNote
+    assert "%0 Journal Article" in endnote, "EndNote should have article type"
+    assert "%A John Smith" in endnote, "Authors should use %A tag"
+    assert "%T Effects of Yoga on Anxiety" in endnote, "Title should use %T tag"
+    assert "%R 10.1234/jcm.2024.0001" in endnote, "DOI should use %R tag"
+    print("\n[PASS] EndNote export valid")
+    
+    print("\n" + "-"*40)
+    print("TEST 4: Multiple Articles Export")
+    print("-"*40)
+    
+    # Create second mock article
+    mock_article2 = ArticleInfo(
+        pmid="87654321",
+        title="Exercise for Depression in Older Adults",
+        authors=["Sarah Wilson"],
+        journal="Geriatric Medicine Journal",
+        pub_date="Mar 2023",
+        abstract="Exercise improves depression in elderly patients.",
+        doi="10.5678/gmj.2023.002",
+        pub_types=["Systematic Review"],
+        mesh_terms=["Depression", "Exercise", "Aged"]
+    )
+    
+    # Test multi-export
+    multi_bibtex = exporter.export_multiple([mock_article, mock_article2], "bibtex")
+    assert "@article{pmid12345678," in multi_bibtex, "First article should be in export"
+    assert "@article{pmid87654321," in multi_bibtex, "Second article should be in export"
+    print(f"BibTeX multi-export: {len(multi_bibtex)} characters")
+    print("[PASS] Multiple BibTeX export valid")
+    
+    multi_ris = exporter.export_multiple([mock_article, mock_article2], "ris")
+    assert multi_ris.count("TY  - JOUR") == 2, "Should have two RIS entries"
+    print(f"RIS multi-export: {len(multi_ris)} characters")
+    print("[PASS] Multiple RIS export valid")
+    
+    print(f"\n{'='*80}")
+    print("ALL CITATION EXPORT TESTS PASSED")
+    print(f"{'='*80}\n")
+    
+    return True
+
+
+async def test_citation_export_live():
+    """Test citation export with real PubMed articles"""
+    print(f"\n{'='*80}")
+    print("LIVE CITATION EXPORT TEST")
+    print(f"{'='*80}")
+    
+    pubmed_client = PubMedClient()
+    exporter = CitationExporter()
+    
+    # Search for real articles
+    print("\nSearching PubMed for 'yoga anxiety'...")
+    pmids = await pubmed_client.search("yoga anxiety randomized", max_results=3)
+    print(f"Found {len(pmids)} articles: {pmids}")
+    
+    if not pmids:
+        print("No articles found, skipping live test")
+        await pubmed_client.close()
+        return
+    
+    # Fetch and export
+    articles = []
+    for pmid in pmids:
+        article = await pubmed_client.fetch_article(pmid)
+        if article:
+            articles.append(article)
+    
+    print(f"\nFetched {len(articles)} articles")
+    
+    # Export to each format
+    for format_name in ["bibtex", "ris", "endnote"]:
+        print(f"\n{'-'*40}")
+        print(f"{format_name.upper()} Export:")
+        print(f"{'-'*40}")
+        exported = exporter.export_multiple(articles, format_name)
+        # Show first 500 chars
+        preview = exported[:500] + "..." if len(exported) > 500 else exported
+        print(preview)
+    
+    await pubmed_client.close()
+    
+    print(f"\n{'='*80}")
+    print("LIVE CITATION EXPORT TEST COMPLETED")
+    print(f"{'='*80}\n")
+
+
 if __name__ == "__main__":
     # First run PICO extraction tests (fast, no API calls)
     passed, failed = test_pico_extraction()
+    
+    # Run citation export tests (no API calls)
+    test_citation_export()
     
     # Then run full search test if extraction tests pass
     if failed == 0:
         print("\nAll PICO extraction tests passed! Running full search test...\n")
         asyncio.run(test_full_search())
+        
+        # Run live citation export test
+        print("\nRunning live citation export test...")
+        asyncio.run(test_citation_export_live())
     else:
         print(f"\n{failed} PICO extraction tests failed. Fix issues before running full search.\n")
