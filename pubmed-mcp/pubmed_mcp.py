@@ -1789,84 +1789,84 @@ class EvidenceCompass:
         )
     
     def format_ascii_display(self, result: EvidenceCompassResult) -> str:
-        """Format the result as an ASCII display for terminal output."""
+        """Format the result as a clean, readable display for Gemini CLI."""
         
-        # Create progress bar
+        # Create simple text progress bar using basic ASCII
         def make_bar(percent: int, width: int = 20) -> str:
             filled = int(width * percent / 100)
-            return "█" * filled + "░" * (width - filled)
+            return "[" + "#" * filled + "-" * (width - filled) + "]"
         
         support_bar = make_bar(result.weighted_support_percent)
         against_bar = make_bar(100 - result.weighted_support_percent)
         
-        # Build output
+        # Trend arrow using simple ASCII
+        trend_arrows = {"strengthening": "^", "weakening": "v", "stable": "="}
+        
+        # Build clean markdown-style output
         lines = [
-            "╔══════════════════════════════════════════════════════════════╗",
-            "║                     EVIDENCE COMPASS                          ║",
-            "╠══════════════════════════════════════════════════════════════╣",
-            f"║  Query: {self.query[:52]:<52} ║",
-            "║                                                              ║",
-            f"║  VERDICT: {result.verdict:<48} ║",
-            "║                                                              ║",
-            f"║  Support {support_bar} {result.weighted_support_percent:>3}% (weighted)      ║",
-            f"║  Against {against_bar} {100-result.weighted_support_percent:>3}%              ║",
-            "║                                                              ║",
-            f"║  Raw agreement: {result.raw_support_percent}% | Weighted: {result.weighted_support_percent}%                    ║",
-            "║                                                              ║",
-            "║  EVIDENCE BREAKDOWN                                          ║",
-            "║  ────────────────────                                        ║",
+            "",
+            "=" * 60,
+            "EVIDENCE COMPASS",
+            "=" * 60,
+            "",
+            f"VERDICT: {result.verdict}",
+            "",
+            f"  Support: {support_bar} {result.weighted_support_percent}%",
+            f"  Against: {against_bar} {100 - result.weighted_support_percent}%",
+            "",
+            f"  Studies: {result.supporting_studies} support | {result.opposing_studies} against | {result.neutral_studies} neutral",
+            "",
+            "-" * 40,
+            "EVIDENCE BY GRADE:",
         ]
         
         for grade in ["A", "B", "C", "D"]:
             if grade in result.grade_breakdown:
                 b = result.grade_breakdown[grade]
-                if b["support"] + b["against"] + b["neutral"] > 0:
-                    lines.append(f"║    Grade {grade}: {b['support']} support, {b['against']} against, {b['neutral']} neutral          ║")
+                total = b["support"] + b["against"] + b["neutral"]
+                if total > 0:
+                    lines.append(f"  Grade {grade}: {b['support']} support, {b['against']} against")
         
         lines.extend([
-            "║                                                              ║",
-            f"║  CONFIDENCE: {result.confidence_level:<46} ║",
+            "",
+            "-" * 40,
+            f"CONFIDENCE: {result.confidence_level}",
         ])
         
         for reason in result.confidence_reasons[:3]:
-            lines.append(f"║    • {reason:<54} ║")
+            lines.append(f"  - {reason}")
         
-        # v2.2.0: Add trend analysis section
+        # v2.2.0: Add trend analysis
         if result.recency_trend and result.recency_trend.trend_direction != "insufficient_data":
             trend = result.recency_trend
-            trend_icon = {"strengthening": "↑", "weakening": "↓", "stable": "→"}.get(trend.trend_direction, "?")
+            arrow = trend_arrows.get(trend.trend_direction, "?")
             lines.extend([
-                "║                                                              ║",
-                "║  EVIDENCE TREND                                              ║",
-                "║  ──────────────────                                          ║",
-                f"║    {trend_icon} {trend.trend_description:<55} ║",
-                f"║    Studies: {trend.recent_study_count} recent, {trend.older_study_count} older ({trend.year_range[0]}-{trend.year_range[1]})          ║",
-                f"║    Research activity: {trend.research_activity:<36} ║",
+                "",
+                "-" * 40,
+                f"EVIDENCE TREND: {arrow} {trend.trend_direction.upper()}",
+                f"  {trend.trend_description}",
+                f"  Recent studies: {trend.recent_study_count} | Older studies: {trend.older_study_count}",
+                f"  Year range: {trend.year_range[0]}-{trend.year_range[1]}",
+                f"  Research activity: {trend.research_activity}",
             ])
         
-        # v2.2.0: Add sample size weighted score if different from quality-weighted
+        # v2.2.0: Sample size weighted if different
         if result.sample_size_weighted_percent is not None:
             diff = abs(result.sample_size_weighted_percent - result.weighted_support_percent)
-            if diff >= 5:  # Only show if meaningfully different
+            if diff >= 5:
                 lines.extend([
-                    "║                                                              ║",
-                    f"║  Sample-size weighted: {result.sample_size_weighted_percent}% support                         ║",
+                    "",
+                    f"  Sample-size weighted support: {result.sample_size_weighted_percent}%",
                 ])
         
         lines.extend([
-            "║                                                              ║",
-            "║  CLINICAL BOTTOM LINE:                                       ║",
+            "",
+            "-" * 40,
+            "CLINICAL BOTTOM LINE:",
+            f"  {result.clinical_bottom_line}",
+            "",
+            "=" * 60,
         ])
-        
-        # Word wrap the bottom line
-        bottom_line = result.clinical_bottom_line
-        while len(bottom_line) > 54:
-            lines.append(f"║    {bottom_line[:54]} ║")
-            bottom_line = bottom_line[54:]
-        if bottom_line:
-            lines.append(f"║    {bottom_line:<54} ║")
-        
-        lines.append("╚══════════════════════════════════════════════════════════════╝")
         
         return "\n".join(lines)
 
