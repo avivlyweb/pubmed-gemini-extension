@@ -1915,7 +1915,6 @@ class ResearchSynthesizer:
         # Generate Evidence Compass analysis
         compass = EvidenceCompass(query)
         compass_result = compass.analyze(articles, trust_scores)
-        ascii_display = compass.format_ascii_display(compass_result)
         
         return {
             "query": query,
@@ -1943,8 +1942,7 @@ class ResearchSynthesizer:
                     "older_study_count": compass_result.recency_trend.older_study_count if compass_result.recency_trend else None,
                     "year_range": list(compass_result.recency_trend.year_range) if compass_result.recency_trend else None,
                     "research_activity": compass_result.recency_trend.research_activity if compass_result.recency_trend else None
-                } if compass_result.recency_trend else None,
-                "display": ascii_display
+                } if compass_result.recency_trend else None
             },
             "evidence_summary": evidence_summary,
             "synthesis": synthesis,
