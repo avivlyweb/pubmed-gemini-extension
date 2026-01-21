@@ -6,7 +6,7 @@
   "mcpServers": {
     "pubmed": {
       "command": "node",
-      "args": ["${extensionPath}${/}pubmed-gemini${/}pubmed-wrapper.js"],
+      "args": ["${extensionPath}${/}pubmed-wrapper.js"],
       "cwd": "${extensionPath}"
     }
   }
