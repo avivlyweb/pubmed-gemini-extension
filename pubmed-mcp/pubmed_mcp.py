@@ -386,6 +386,607 @@ class StudySnapshotGenerator:
         )
 
 
+# ============================================================================
+# Key Findings Extractor (v2.5.0)
+# ============================================================================
+
+@dataclass
+class KeyFinding:
+    """Extracted key finding from a study abstract (v2.5.0)"""
+    statement: str  # The main finding sentence
+    direction: str  # "positive", "negative", "neutral", "mixed"
+    effect_size: Optional[str] = None  # e.g., "34% reduction", "SMD=0.77"
+    p_value: Optional[str] = None  # e.g., "p<0.001"
+    confidence_interval: Optional[str] = None  # e.g., "95% CI [0.65, 0.99]"
+    nnt: Optional[int] = None  # Number needed to treat
+    practical_significance: Optional[str] = None  # "large", "medium", "small", "negligible"
+
+
+class KeyFindingsExtractor:
+    """
+    Extract the KEY finding from an abstract (v2.5.0).
+    
+    Instead of just truncating the abstract, this extracts:
+    - The main result statement
+    - Effect sizes (%, SMD, OR, RR, HR)
+    - Statistical significance (p-values)
+    - Confidence intervals
+    - Practical significance assessment
+    """
+    
+    # Patterns for finding result/conclusion sentences
+    RESULT_INDICATORS = [
+        r"(?:results?|findings?)\s*(?:showed?|indicated?|demonstrated?|revealed?|suggested?)",
+        r"(?:we\s+)?found\s+that",
+        r"(?:there\s+was|were)\s+(?:a\s+)?significant",
+        r"(?:significantly|substantially)\s+(?:reduced|increased|improved|decreased)",
+        r"compared\s+(?:to|with)\s+.{1,50}?,\s*.{1,100}?(?:was|were|had)",
+        r"the\s+(?:primary|main|principal)\s+(?:outcome|finding|result)",
+    ]
+    
+    # Patterns for effect sizes
+    EFFECT_SIZE_PATTERNS = [
+        # Percentage changes
+        (r"(\d+(?:\.\d+)?)\s*%\s*(?:reduction|decrease|lower)", "reduction", "negative"),
+        (r"(\d+(?:\.\d+)?)\s*%\s*(?:increase|improvement|higher)", "increase", "positive"),
+        (r"(?:reduced|decreased)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*%", "reduction", "positive"),
+        (r"(?:increased|improved)\s+(?:by\s+)?(\d+(?:\.\d+)?)\s*%", "increase", "positive"),
+        # Standardized mean difference
+        (r"(?:SMD|standardized mean difference)\s*[=:]\s*[-−]?(\d+(?:\.\d+)?)", "SMD", None),
+        (r"(?:Cohen['']?s?\s*)?[dD]\s*[=:]\s*[-−]?(\d+(?:\.\d+)?)", "Cohen's d", None),
+        # Odds/Risk/Hazard ratios
+        (r"(?:OR|odds ratio)\s*[=:]\s*(\d+(?:\.\d+)?)", "OR", None),
+        (r"(?:RR|risk ratio|relative risk)\s*[=:]\s*(\d+(?:\.\d+)?)", "RR", None),
+        (r"(?:HR|hazard ratio)\s*[=:]\s*(\d+(?:\.\d+)?)", "HR", None),
+        # Mean difference
+        (r"(?:MD|mean difference)\s*[=:]\s*[-−]?(\d+(?:\.\d+)?)", "MD", None),
+    ]
+    
+    # P-value patterns
+    P_VALUE_PATTERNS = [
+        r"p\s*[<≤=]\s*0?\.?\d+",
+        r"p\s*-?\s*value\s*[<≤=:]\s*0?\.?\d+",
+        r"(?:statistically\s+)?significant\s*\(p\s*[<≤=]\s*0?\.?\d+\)",
+    ]
+    
+    # Confidence interval patterns
+    CI_PATTERNS = [
+        r"95\s*%?\s*CI\s*[:\s]*\[?\s*[-−]?\d+(?:\.\d+)?\s*[,;to-]+\s*[-−]?\d+(?:\.\d+)?\s*\]?",
+        r"CI\s*95\s*%?\s*[:\s]*\[?\s*[-−]?\d+(?:\.\d+)?\s*[,;to-]+\s*[-−]?\d+(?:\.\d+)?\s*\]?",
+        r"\(\s*[-−]?\d+(?:\.\d+)?\s*[,;to-]+\s*[-−]?\d+(?:\.\d+)?\s*\)",
+    ]
+    
+    # No effect indicators
+    NO_EFFECT_PATTERNS = [
+        r"no\s+significant\s+(?:difference|effect|improvement|change)",
+        r"did\s+not\s+(?:significantly\s+)?(?:differ|improve|change)",
+        r"not\s+statistically\s+significant",
+        r"failed\s+to\s+(?:show|demonstrate|reach)",
+        r"similar\s+(?:to|between)",
+        r"comparable\s+(?:to|between)",
+        r"no\s+(?:evidence|benefit)",
+    ]
+    
+    def __init__(self):
+        self._compile_patterns()
+    
+    def _compile_patterns(self):
+        """Pre-compile regex patterns"""
+        self.result_regex = [re.compile(p, re.IGNORECASE) for p in self.RESULT_INDICATORS]
+        self.p_value_regex = [re.compile(p, re.IGNORECASE) for p in self.P_VALUE_PATTERNS]
+        self.ci_regex = [re.compile(p, re.IGNORECASE) for p in self.CI_PATTERNS]
+        self.no_effect_regex = [re.compile(p, re.IGNORECASE) for p in self.NO_EFFECT_PATTERNS]
+    
+    def _extract_result_sentences(self, abstract: str) -> List[str]:
+        """Extract sentences that contain results."""
+        # Split into sentences
+        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', abstract)
+        
+        result_sentences = []
+        for sentence in sentences:
+            # Check if sentence contains result indicators
+            for regex in self.result_regex:
+                if regex.search(sentence):
+                    result_sentences.append(sentence.strip())
+                    break
+            # Also check for statistical values
+            if re.search(r'p\s*[<≤=]\s*0?\.\d+', sentence, re.IGNORECASE):
+                if sentence.strip() not in result_sentences:
+                    result_sentences.append(sentence.strip())
+        
+        return result_sentences
+    
+    def _extract_conclusion_section(self, abstract: str) -> str:
+        """Extract conclusion/results section from structured abstract."""
+        # Look for labeled sections
+        for label in ["conclusion", "conclusions", "results", "findings"]:
+            pattern = rf"{label}s?\s*:\s*(.+?)(?:(?:\n[A-Z]+:)|$)"
+            match = re.search(pattern, abstract, re.IGNORECASE | re.DOTALL)
+            if match:
+                return match.group(1).strip()
+        return ""
+    
+    def _extract_effect_size(self, text: str) -> Tuple[Optional[str], Optional[str]]:
+        """Extract effect size and determine direction."""
+        for pattern, label, direction in self.EFFECT_SIZE_PATTERNS:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                value = match.group(1)
+                if label in ["reduction", "decrease"]:
+                    return f"{value}% reduction", "positive"  # Reduction is usually good
+                elif label in ["increase", "improvement"]:
+                    return f"{value}% improvement", "positive"
+                elif label == "SMD" or label == "Cohen's d":
+                    # Assess practical significance
+                    d_value = float(value)
+                    if d_value >= 0.8:
+                        return f"SMD = {value} (large effect)", None
+                    elif d_value >= 0.5:
+                        return f"SMD = {value} (medium effect)", None
+                    elif d_value >= 0.2:
+                        return f"SMD = {value} (small effect)", None
+                    else:
+                        return f"SMD = {value} (negligible)", None
+                elif label in ["OR", "RR", "HR"]:
+                    ratio = float(value)
+                    if ratio < 1:
+                        return f"{label} = {value} (protective)", "positive"
+                    elif ratio > 1:
+                        return f"{label} = {value} (risk factor)", "negative"
+                    else:
+                        return f"{label} = {value} (no effect)", "neutral"
+                else:
+                    return f"{label} = {value}", None
+        return None, None
+    
+    def _extract_p_value(self, text: str) -> Optional[str]:
+        """Extract p-value from text."""
+        for regex in self.p_value_regex:
+            match = regex.search(text)
+            if match:
+                return match.group(0).strip()
+        return None
+    
+    def _extract_ci(self, text: str) -> Optional[str]:
+        """Extract confidence interval from text."""
+        for regex in self.ci_regex:
+            match = regex.search(text)
+            if match:
+                return match.group(0).strip()
+        return None
+    
+    def _determine_practical_significance(self, effect_size: Optional[str]) -> Optional[str]:
+        """Determine practical significance from effect size."""
+        if not effect_size:
+            return None
+        
+        effect_lower = effect_size.lower()
+        if "large" in effect_lower:
+            return "large"
+        elif "medium" in effect_lower:
+            return "medium"
+        elif "small" in effect_lower:
+            return "small"
+        elif "negligible" in effect_lower:
+            return "negligible"
+        
+        # Try to infer from percentage
+        pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", effect_size)
+        if pct_match:
+            pct = float(pct_match.group(1))
+            if pct >= 50:
+                return "large"
+            elif pct >= 25:
+                return "medium"
+            elif pct >= 10:
+                return "small"
+            else:
+                return "negligible"
+        
+        return None
+    
+    def _determine_direction(self, text: str, effect_direction: Optional[str]) -> str:
+        """Determine if finding is positive, negative, or neutral."""
+        text_lower = text.lower()
+        
+        # Check for no effect patterns
+        for regex in self.no_effect_regex:
+            if regex.search(text_lower):
+                return "neutral"
+        
+        # Use effect direction if available
+        if effect_direction:
+            return effect_direction
+        
+        # Keyword-based fallback
+        positive_keywords = ["effective", "beneficial", "improved", "reduced", "significant improvement"]
+        negative_keywords = ["no effect", "ineffective", "no significant", "failed", "no benefit"]
+        
+        pos_count = sum(1 for kw in positive_keywords if kw in text_lower)
+        neg_count = sum(1 for kw in negative_keywords if kw in text_lower)
+        
+        if pos_count > neg_count:
+            return "positive"
+        elif neg_count > pos_count:
+            return "negative"
+        else:
+            return "neutral"
+    
+    def extract(self, article: ArticleInfo) -> KeyFinding:
+        """Extract the key finding from an article."""
+        if article.abstract == "No abstract available":
+            return KeyFinding(
+                statement="No abstract available",
+                direction="neutral"
+            )
+        
+        # Try to get conclusion section first
+        conclusion = self._extract_conclusion_section(article.abstract)
+        
+        # Get result sentences
+        result_sentences = self._extract_result_sentences(article.abstract)
+        
+        # Choose the best sentence for the key finding
+        if conclusion:
+            # First sentence of conclusion
+            sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', conclusion)
+            key_sentence = sentences[0] if sentences else conclusion[:200]
+        elif result_sentences:
+            # First result sentence
+            key_sentence = result_sentences[0]
+        else:
+            # Fallback: last 2 sentences of abstract (usually conclusion)
+            sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', article.abstract)
+            key_sentence = sentences[-1] if sentences else article.abstract[-200:]
+        
+        # Truncate if too long
+        if len(key_sentence) > 250:
+            key_sentence = key_sentence[:247] + "..."
+        
+        # Extract statistical details from full abstract
+        effect_size, effect_direction = self._extract_effect_size(article.abstract)
+        p_value = self._extract_p_value(article.abstract)
+        ci = self._extract_ci(article.abstract)
+        practical = self._determine_practical_significance(effect_size)
+        direction = self._determine_direction(key_sentence, effect_direction)
+        
+        return KeyFinding(
+            statement=key_sentence,
+            direction=direction,
+            effect_size=effect_size,
+            p_value=p_value,
+            confidence_interval=ci,
+            practical_significance=practical
+        )
+
+
+# ============================================================================
+# Contradiction Explainer (v2.5.0)
+# ============================================================================
+
+@dataclass
+class StudyCharacteristics:
+    """Extracted characteristics for contradiction analysis (v2.5.0)"""
+    population: Optional[str] = None
+    population_age: Optional[str] = None
+    population_condition: Optional[str] = None
+    sample_size: Optional[int] = None
+    intervention_dose: Optional[str] = None
+    intervention_duration: Optional[str] = None
+    intervention_frequency: Optional[str] = None
+    follow_up: Optional[str] = None
+    outcome_measure: Optional[str] = None
+    country: Optional[str] = None
+    setting: Optional[str] = None
+
+
+@dataclass
+class ContradictionExplanation:
+    """Explanation for why studies show conflicting results (v2.5.0)"""
+    has_contradiction: bool
+    summary: str
+    supporting_count: int
+    opposing_count: int
+    factors: List[Dict[str, str]]  # [{"factor": "Population", "detail": "..."}]
+    synthesis: str  # Synthesized conclusion considering the differences
+
+
+class ContradictionExplainer:
+    """
+    Explain WHY studies show conflicting results (v2.5.0).
+    
+    Analyzes differences in:
+    - Population characteristics (age, condition severity, baseline)
+    - Intervention parameters (dose, frequency, duration)
+    - Study design (follow-up, outcome measures)
+    - Setting (country, clinical vs community)
+    """
+    
+    # Age patterns
+    AGE_PATTERNS = [
+        (r"(?:elderly|older\s+adults?|aged?)\s*(?:[>≥]\s*)?(\d+)", "elderly"),
+        (r"(\d+)\s*[-–to]+\s*(\d+)\s*years?", "range"),
+        (r"(?:mean|average)\s+age\s*[=:of]*\s*(\d+(?:\.\d+)?)", "mean"),
+        (r"(?:children|pediatric|adolescent)", "pediatric"),
+        (r"(?:adult|middle-aged)", "adult"),
+    ]
+    
+    # Dose patterns
+    DOSE_PATTERNS = [
+        r"(\d+(?:,\d+)?(?:\.\d+)?)\s*(?:mg|g|mcg|μg|IU|iu|ml|mL)(?:/(?:day|d|kg|dose))?",
+        r"(?:low|high|moderate)\s*(?:-?\s*)?dose",
+        r"(\d+(?:\.\d+)?)\s*(?:mg|g|IU)/(?:day|kg)",
+    ]
+    
+    # Duration patterns  
+    DURATION_PATTERNS = [
+        r"(\d+)\s*(?:weeks?|wks?)",
+        r"(\d+)\s*(?:months?|mos?)",
+        r"(\d+)\s*(?:years?|yrs?)",
+        r"(\d+)\s*(?:days?)",
+    ]
+    
+    # Frequency patterns
+    FREQUENCY_PATTERNS = [
+        r"(?:once|twice|three times?|thrice)\s*(?:daily|weekly|monthly|per\s+(?:day|week|month))",
+        r"(\d+)\s*(?:times?|x)\s*(?:per|/)\s*(?:day|week|month)",
+        r"(?:daily|weekly|monthly|annually)",
+        r"(?:every|each)\s+(?:day|week|month|other\s+day)",
+    ]
+    
+    # Outcome measure patterns
+    OUTCOME_PATTERNS = [
+        r"(?:primary\s+)?(?:outcome|endpoint)\s*(?:was|:)\s*([^.]+)",
+        r"(?:measured|assessed)\s+(?:by|using|with)\s+([^.]+)",
+    ]
+    
+    # Setting patterns
+    SETTING_PATTERNS = [
+        r"(?:hospital|clinic|outpatient|inpatient|community|primary care|nursing home)",
+    ]
+    
+    # Country patterns
+    COUNTRY_PATTERNS = [
+        r"(?:in|from)\s+((?:the\s+)?(?:United States|USA|UK|United Kingdom|China|Japan|Germany|France|Italy|Spain|Australia|Canada|India|Brazil|Korea|Netherlands|Sweden|Switzerland))",
+    ]
+    
+    def __init__(self):
+        self._compile_patterns()
+    
+    def _compile_patterns(self):
+        """Pre-compile patterns."""
+        self.dose_regex = [re.compile(p, re.IGNORECASE) for p in self.DOSE_PATTERNS]
+        self.duration_regex = [re.compile(p, re.IGNORECASE) for p in self.DURATION_PATTERNS]
+        self.frequency_regex = [re.compile(p, re.IGNORECASE) for p in self.FREQUENCY_PATTERNS]
+    
+    def _extract_characteristics(self, article: ArticleInfo) -> StudyCharacteristics:
+        """Extract study characteristics from abstract."""
+        abstract = article.abstract
+        chars = StudyCharacteristics()
+        
+        # Extract age
+        for pattern, age_type in self.AGE_PATTERNS:
+            match = re.search(pattern, abstract, re.IGNORECASE)
+            if match:
+                if age_type == "elderly":
+                    chars.population_age = f"elderly (≥{match.group(1)} years)" if match.lastindex else "elderly"
+                elif age_type == "range":
+                    chars.population_age = f"{match.group(1)}-{match.group(2)} years"
+                elif age_type == "mean":
+                    chars.population_age = f"mean age {match.group(1)} years"
+                elif age_type == "pediatric":
+                    chars.population_age = "pediatric"
+                elif age_type == "adult":
+                    chars.population_age = "adults"
+                break
+        
+        # Extract sample size
+        sample_patterns = [r"n\s*=\s*(\d+)", r"(\d+)\s*(?:patients|participants|subjects)"]
+        for pattern in sample_patterns:
+            matches = re.findall(pattern, abstract, re.IGNORECASE)
+            if matches:
+                try:
+                    chars.sample_size = max(int(m) for m in matches)
+                except:
+                    pass
+                break
+        
+        # Extract dose
+        for regex in self.dose_regex:
+            match = regex.search(abstract)
+            if match:
+                chars.intervention_dose = match.group(0)
+                break
+        
+        # Extract duration
+        for regex in self.duration_regex:
+            match = regex.search(abstract)
+            if match:
+                chars.intervention_duration = match.group(0)
+                break
+        
+        # Extract frequency
+        for regex in self.frequency_regex:
+            match = regex.search(abstract)
+            if match:
+                chars.intervention_frequency = match.group(0)
+                break
+        
+        # Extract setting
+        for pattern in self.SETTING_PATTERNS:
+            match = re.search(pattern, abstract, re.IGNORECASE)
+            if match:
+                chars.setting = match.group(0).lower()
+                break
+        
+        # Extract country
+        for pattern in self.COUNTRY_PATTERNS:
+            match = re.search(pattern, abstract, re.IGNORECASE)
+            if match:
+                chars.country = match.group(1)
+                break
+        
+        return chars
+    
+    def _compare_characteristics(
+        self, 
+        supporting: List[StudyCharacteristics],
+        opposing: List[StudyCharacteristics]
+    ) -> List[Dict[str, str]]:
+        """Compare characteristics between supporting and opposing studies."""
+        factors = []
+        
+        # Compare sample sizes
+        sup_sizes = [s.sample_size for s in supporting if s.sample_size]
+        opp_sizes = [s.sample_size for s in opposing if s.sample_size]
+        if sup_sizes and opp_sizes:
+            sup_avg = sum(sup_sizes) / len(sup_sizes)
+            opp_avg = sum(opp_sizes) / len(opp_sizes)
+            if abs(sup_avg - opp_avg) > 100:
+                larger = "Supporting" if sup_avg > opp_avg else "Opposing"
+                factors.append({
+                    "factor": "Sample Size",
+                    "detail": f"{larger} studies had larger samples (avg {int(max(sup_avg, opp_avg))} vs {int(min(sup_avg, opp_avg))})"
+                })
+        
+        # Compare ages
+        sup_ages = [s.population_age for s in supporting if s.population_age]
+        opp_ages = [s.population_age for s in opposing if s.population_age]
+        if sup_ages and opp_ages:
+            sup_age_str = ", ".join(set(sup_ages))
+            opp_age_str = ", ".join(set(opp_ages))
+            if sup_age_str != opp_age_str:
+                factors.append({
+                    "factor": "Population Age",
+                    "detail": f"Supporting studies: {sup_age_str}. Opposing studies: {opp_age_str}"
+                })
+        
+        # Compare doses
+        sup_doses = [s.intervention_dose for s in supporting if s.intervention_dose]
+        opp_doses = [s.intervention_dose for s in opposing if s.intervention_dose]
+        if sup_doses and opp_doses:
+            sup_dose_str = ", ".join(set(sup_doses))
+            opp_dose_str = ", ".join(set(opp_doses))
+            if sup_dose_str != opp_dose_str:
+                factors.append({
+                    "factor": "Intervention Dose",
+                    "detail": f"Supporting studies: {sup_dose_str}. Opposing studies: {opp_dose_str}"
+                })
+        
+        # Compare durations
+        sup_durations = [s.intervention_duration for s in supporting if s.intervention_duration]
+        opp_durations = [s.intervention_duration for s in opposing if s.intervention_duration]
+        if sup_durations and opp_durations:
+            sup_dur_str = ", ".join(set(sup_durations))
+            opp_dur_str = ", ".join(set(opp_durations))
+            if sup_dur_str != opp_dur_str:
+                factors.append({
+                    "factor": "Study Duration",
+                    "detail": f"Supporting studies: {sup_dur_str}. Opposing studies: {opp_dur_str}"
+                })
+        
+        # Compare settings
+        sup_settings = [s.setting for s in supporting if s.setting]
+        opp_settings = [s.setting for s in opposing if s.setting]
+        if sup_settings and opp_settings:
+            sup_set_str = ", ".join(set(sup_settings))
+            opp_set_str = ", ".join(set(opp_settings))
+            if sup_set_str != opp_set_str:
+                factors.append({
+                    "factor": "Study Setting",
+                    "detail": f"Supporting studies: {sup_set_str}. Opposing studies: {opp_set_str}"
+                })
+        
+        return factors
+    
+    def _generate_synthesis(
+        self,
+        query: str,
+        supporting_count: int,
+        opposing_count: int,
+        factors: List[Dict[str, str]]
+    ) -> str:
+        """Generate a synthesized conclusion."""
+        if not factors:
+            if supporting_count > opposing_count:
+                return f"Most studies support this intervention, but some conflicting results exist. More research needed to understand the discrepancy."
+            else:
+                return f"Evidence is mixed. Consider individual patient factors when making decisions."
+        
+        # Build synthesis based on factors found
+        factor_names = [f["factor"] for f in factors]
+        
+        synthesis_parts = []
+        
+        if "Population Age" in factor_names:
+            synthesis_parts.append("effects may vary by age group")
+        if "Intervention Dose" in factor_names:
+            synthesis_parts.append("dose may be critical for effectiveness")
+        if "Study Duration" in factor_names:
+            synthesis_parts.append("longer treatment periods may be needed")
+        if "Sample Size" in factor_names:
+            synthesis_parts.append("larger studies may provide more reliable estimates")
+        if "Study Setting" in factor_names:
+            synthesis_parts.append("results may differ between clinical and community settings")
+        
+        if synthesis_parts:
+            return f"The conflicting results suggest that {', '.join(synthesis_parts)}. Consider these factors when applying evidence to specific patients."
+        else:
+            return "Studies show conflicting results. Individual patient characteristics should guide clinical decisions."
+    
+    def explain(
+        self,
+        query: str,
+        articles: List[ArticleInfo],
+        stances: List[str]  # "support", "oppose", "neutral"
+    ) -> ContradictionExplanation:
+        """Analyze and explain contradictions between studies."""
+        
+        # Separate studies by stance
+        supporting_articles = [a for a, s in zip(articles, stances) if s == "support"]
+        opposing_articles = [a for a, s in zip(articles, stances) if s == "oppose"]
+        
+        supporting_count = len(supporting_articles)
+        opposing_count = len(opposing_articles)
+        
+        # Check if there's a real contradiction
+        total = supporting_count + opposing_count
+        if total == 0 or opposing_count == 0 or supporting_count == 0:
+            return ContradictionExplanation(
+                has_contradiction=False,
+                summary="No significant contradiction detected in the evidence",
+                supporting_count=supporting_count,
+                opposing_count=opposing_count,
+                factors=[],
+                synthesis="Studies are generally consistent in their findings."
+            )
+        
+        # Extract characteristics from each group
+        supporting_chars = [self._extract_characteristics(a) for a in supporting_articles]
+        opposing_chars = [self._extract_characteristics(a) for a in opposing_articles]
+        
+        # Compare and find differences
+        factors = self._compare_characteristics(supporting_chars, opposing_chars)
+        
+        # Generate synthesis
+        synthesis = self._generate_synthesis(query, supporting_count, opposing_count, factors)
+        
+        # Build summary
+        if factors:
+            summary = f"Conflicting results found: {supporting_count} studies support, {opposing_count} oppose. Key differences identified in: {', '.join(f['factor'] for f in factors)}."
+        else:
+            summary = f"Conflicting results found: {supporting_count} studies support, {opposing_count} oppose. Unable to identify clear methodological differences."
+        
+        return ContradictionExplanation(
+            has_contradiction=True,
+            summary=summary,
+            supporting_count=supporting_count,
+            opposing_count=opposing_count,
+            factors=factors,
+            synthesis=synthesis
+        )
+
+
 class PubMedClient:
     """Async client for PubMed E-utilities API"""
     
@@ -2478,6 +3079,9 @@ class ResearchSynthesizer:
         self.client = client
         self.analyzer = analyzer
         self.snapshot_generator = StudySnapshotGenerator()
+        # v2.5.0: Key findings and contradiction analysis
+        self.key_findings_extractor = KeyFindingsExtractor()
+        self.contradiction_explainer = ContradictionExplainer()
     
     async def synthesize(self, query: str, max_articles: int = 10) -> Dict[str, Any]:
         pmids = await self.client.search(query, max_articles)
@@ -2559,6 +3163,15 @@ class ResearchSynthesizer:
                     # v2.4.0: Study snapshot
                     "snapshot": self.snapshot_generator.generate(a).summary,
                     "finding_direction": self.snapshot_generator.generate(a).key_finding,
+                    # v2.5.0: Key finding with statistical details
+                    "key_finding": {
+                        "statement": (kf := self.key_findings_extractor.extract(a)).statement,
+                        "direction": kf.direction,
+                        "effect_size": kf.effect_size,
+                        "p_value": kf.p_value,
+                        "confidence_interval": kf.confidence_interval,
+                        "practical_significance": kf.practical_significance
+                    },
                     # v2.4.0: Clickable full-text links
                     "links": generate_full_text_links(a).to_dict()
                 }
@@ -2568,6 +3181,8 @@ class ResearchSynthesizer:
                     reverse=True
                 )[:5]
             ],
+            # v2.5.0: Contradiction analysis
+            "contradiction_analysis": self._generate_contradiction_analysis(query, articles, trust_scores, compass),
             "clinical_recommendations": recommendations,
             "research_gaps": research_gaps
         }
@@ -2639,6 +3254,36 @@ class ResearchSynthesizer:
             gaps.append("Consider long-term follow-up studies")
         
         return gaps[:4]
+    
+    def _generate_contradiction_analysis(
+        self,
+        query: str,
+        articles: List[ArticleInfo],
+        trust_scores: List[TrustScore],
+        compass: EvidenceCompass
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate contradiction analysis using the ContradictionExplainer (v2.5.0).
+        
+        Returns None if no contradiction is detected.
+        """
+        # Get stances from EvidenceCompass
+        stances = [compass._classify_article_stance(a, t) for a, t in zip(articles, trust_scores)]
+        
+        # Run contradiction analysis
+        contradiction = self.contradiction_explainer.explain(query, articles, stances)
+        
+        if not contradiction.has_contradiction:
+            return None
+        
+        return {
+            "has_contradiction": contradiction.has_contradiction,
+            "summary": contradiction.summary,
+            "supporting_count": contradiction.supporting_count,
+            "opposing_count": contradiction.opposing_count,
+            "factors": contradiction.factors,
+            "synthesis": contradiction.synthesis
+        }
 
 
 # MCP Protocol Implementation
@@ -2652,6 +3297,9 @@ class MCPServer:
         self.synthesizer = ResearchSynthesizer(self.pubmed_client, self.trust_analyzer)
         self.citation_exporter = CitationExporter()
         self.snapshot_generator = StudySnapshotGenerator()
+        # v2.5.0: Key findings and contradiction analysis
+        self.key_findings_extractor = KeyFindingsExtractor()
+        self.contradiction_explainer = ContradictionExplainer()
         
         self.tools = {
             "enhanced_pubmed_search": self._handle_enhanced_search,
@@ -2805,6 +3453,9 @@ class MCPServer:
                 # Generate study snapshot (v2.4.0)
                 snapshot = self.snapshot_generator.generate(article)
                 
+                # v2.5.0: Extract key finding with effect sizes
+                key_finding = self.key_findings_extractor.extract(article)
+                
                 result = {
                     "pmid": article.pmid,
                     "title": article.title,
@@ -2816,6 +3467,15 @@ class MCPServer:
                     "snapshot": snapshot.summary,
                     "finding_direction": snapshot.key_finding,
                     "sample_size": snapshot.sample_size,
+                    # v2.5.0: Key finding with statistical details
+                    "key_finding": {
+                        "statement": key_finding.statement,
+                        "direction": key_finding.direction,
+                        "effect_size": key_finding.effect_size,
+                        "p_value": key_finding.p_value,
+                        "confidence_interval": key_finding.confidence_interval,
+                        "practical_significance": key_finding.practical_significance
+                    },
                     # v2.4.0: Full-text links (clickable URLs)
                     "links": links.to_dict(),
                 }
@@ -3013,8 +3673,8 @@ class MCPServer:
                         "tools": {}
                     },
                     "serverInfo": {
-                        "name": "pubmed-mcp",
-                        "version": "2.4.0"
+                        "name": "pubmed-research-mcp",
+                        "version": "2.5.0"
                     }
                 }
             elif method == "notifications/initialized":

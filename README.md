@@ -2,7 +2,7 @@
 
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
-[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
+[![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
 
