@@ -21,6 +21,49 @@
 
 ---
 
+## New in v2.5 - Key Findings & Contradiction Explainer
+
+### See the Numbers That Matter
+
+Every study now shows the **actual statistical results**:
+
+```
+KEY FINDING:
+  Statement: "Yoga significantly reduced anxiety scores compared to waitlist control"
+  Direction: POSITIVE
+  Effect Size: SMD = 0.77 (medium effect)
+  P-value: p < 0.001
+  95% CI: [0.52, 1.02]
+  Practical Significance: MEDIUM
+```
+
+**What gets extracted:**
+| Metric | Example | Why It Matters |
+|--------|---------|----------------|
+| Effect Size | SMD=0.77, 34% reduction, OR=0.65 | How big is the effect? |
+| P-value | p<0.001, p=0.03 | Is it statistically significant? |
+| Confidence Interval | 95% CI [0.52, 1.02] | How precise is the estimate? |
+| Practical Significance | Large/Medium/Small | Does it matter clinically? |
+
+### Why Do Studies Disagree?
+
+When evidence conflicts, you now get an **explanation**:
+
+```
+CONTRADICTION ANALYSIS:
+  Conflicting results: 8 studies support, 3 oppose
+
+  Key Differences Identified:
+  - Intervention Dose: Supporting studies: 4000 IU/day. Opposing: 400 IU/day
+  - Study Duration: Supporting studies: 24 weeks. Opposing: 8 weeks
+  - Population Age: Supporting: elderly (≥65). Opposing: adults 30-50
+
+  SYNTHESIS: The conflicting results suggest that dose may be critical 
+  for effectiveness, and longer treatment periods may be needed.
+```
+
+---
+
 ## New in v2.4 - Study Snapshots & Full-Text Links
 
 ### Instant Article Understanding
@@ -60,6 +103,8 @@ Direct links to read the full paper:
 - **Trend Analysis** - Is evidence strengthening or weakening?
 
 ### AI Intelligence
+- **Key Findings Extraction** - Effect sizes, p-values, confidence intervals
+- **Contradiction Explainer** - Why do studies disagree?
 - **Study Snapshots** - 2-sentence summaries per article
 - **PICO Extraction** - Automatic clinical question structuring
 - **Finding Direction** - Positive/negative/neutral/mixed detection
@@ -301,6 +346,7 @@ Export those top 5 articles to RIS format
 
 | Version | Features |
 |---------|----------|
+| **2.5.0** | Key Findings Extraction (effect sizes, p-values, CIs), Contradiction Explainer |
 | **2.4.0** | Study Snapshots, Full-Text Links (PMC/PDF), Open Access detection |
 | **2.3.0** | Citation Export (BibTeX, RIS, EndNote) |
 | **2.2.0** | Evidence Trend Analysis, Sample Size Weighting, Research Activity |
