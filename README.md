@@ -8,6 +8,53 @@
 
 ---
 
+## Installation (Copy & Paste - That's It!)
+
+### Mac or Linux
+
+**Step 1:** Open Terminal (search "Terminal" in Spotlight)
+
+**Step 2:** Copy and paste this command, then press Enter:
+```bash
+curl -fsSL https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.sh | bash
+```
+
+**Step 3:** Wait for "Installation complete!" message (about 1-2 minutes)
+
+---
+
+### Windows
+
+**Step 1:** Open PowerShell as Administrator
+- Press Windows key
+- Type "PowerShell"
+- Right-click → "Run as administrator"
+
+**Step 2:** Copy and paste this command, then press Enter:
+```powershell
+irm https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.ps1 | iex
+```
+
+**Step 3:** Wait for "Installation complete!" message (about 1-2 minutes)
+
+---
+
+## Start Using It
+
+After installation, open a new terminal/command prompt and type:
+```
+gemini
+```
+
+Then ask any medical research question:
+```
+Does yoga help with anxiety?
+```
+
+That's it! Gemini will search PubMed and give you an evidence-based answer.
+
+---
+
 ## What Can You Do?
 
 | You Ask | You Get |
@@ -118,43 +165,11 @@ Direct links to read the full paper:
 
 ---
 
-## Quick Start (2 Minutes)
-
-### 1. Install Gemini CLI
-
-```bash
-npm install -g @google/gemini-cli
-```
-
-### 2. Install PubMed Extension
-
-**Mac/Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.sh | bash
-```
-
-**Windows (PowerShell as Admin):**
-```powershell
-irm https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.ps1 | iex
-```
-
-### 3. Start Researching
-
-```bash
-gemini
-```
-
-Then try:
-```
-/pubmed:synthesis does exercise help depression
-```
-
----
-
 ## Commands
 
 | Command | Purpose | Example |
 |---------|---------|---------|
+| Just ask naturally | Gemini understands you | "Does vitamin D help with depression?" |
 | `/pubmed:search` | Find articles on a topic | `/pubmed:search vitamin D bone health` |
 | `/pubmed:synthesis` | Full AI analysis with Evidence Compass | `/pubmed:synthesis yoga for anxiety` |
 | `/pubmed:analyze` | Deep-dive on one article | `/pubmed:analyze 34580864` |
@@ -358,30 +373,42 @@ Export those top 5 articles to RIS format
 
 ## Troubleshooting
 
-### "Extension not loading"
+### "gemini" command not found
+The installer will tell you if Gemini CLI needs to be installed. Follow the link it provides.
+
+### Extension not loading or showing errors
+**Mac/Linux:** Run this again:
 ```bash
-# Reinstall
 curl -fsSL https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.sh | bash
-# Restart Gemini CLI
 ```
+
+**Windows:** Run this again in PowerShell (as Admin):
+```powershell
+irm https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.ps1 | iex
+```
+
+Then restart Gemini by closing and reopening your terminal.
 
 ### "No results found"
 - Try broader search terms
 - Check spelling
 - Use fewer keywords
 
-### "Links not clickable"
-- Your terminal may not support clickable URLs
-- Copy/paste the URL instead
+### Need Help?
+[Open an issue on GitHub](https://github.com/avivlyweb/pubmed-gemini-extension/issues)
 
 ---
 
-## Requirements
+## What Gets Installed?
 
-- **Gemini CLI** - [Get it here](https://github.com/google-gemini/gemini-cli)
-- **Internet connection** - To access PubMed
+The installer automatically sets up:
+- Python (if not already installed)
+- Required packages
+- The PubMed extension
 
-Python and Node.js are handled automatically by the installer.
+Everything is installed in:
+- Mac/Linux: `~/.gemini/extensions/pubmed-gemini/`
+- Windows: `%USERPROFILE%\.gemini\extensions\pubmed-gemini\`
 
 ---
 
