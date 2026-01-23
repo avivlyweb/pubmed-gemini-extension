@@ -2,15 +2,28 @@
 
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
-[![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
+[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
 
 ---
 
-## Installation (Copy & Paste - That's It!)
+## Installation
 
-### Mac or Linux
+### Method 1: Official Gemini CLI (Recommended)
+
+If you already have Gemini CLI installed:
+```bash
+gemini extensions install github:avivlyweb/pubmed-gemini-extension
+```
+
+That's it! The extension will be ready to use.
+
+---
+
+### Method 2: Quick Install Script
+
+**Mac or Linux:**
 
 **Step 1:** Open Terminal (search "Terminal" in Spotlight)
 
@@ -23,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/m
 
 ---
 
-### Windows
+**Windows:**
 
 **Step 1:** Open PowerShell as Administrator
 - Press Windows key
@@ -361,6 +374,7 @@ Export those top 5 articles to RIS format
 
 | Version | Features |
 |---------|----------|
+| **2.6.0** | Official Gemini CLI install support, GitHub Releases distribution |
 | **2.5.0** | Key Findings Extraction (effect sizes, p-values, CIs), Contradiction Explainer |
 | **2.4.0** | Study Snapshots, Full-Text Links (PMC/PDF), Open Access detection |
 | **2.3.0** | Citation Export (BibTeX, RIS, EndNote) |
