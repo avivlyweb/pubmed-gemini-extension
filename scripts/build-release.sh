@@ -53,17 +53,18 @@ if [ -f "$PROJECT_ROOT/pubmed-mcp/test_query.py" ]; then
     cp "$PROJECT_ROOT/pubmed-mcp/test_query.py" "$RELEASE_DIR/pubmed-mcp/"
 fi
 
-# Create the archive
+# Create the archive (only include files that exist)
 echo "Creating archive..."
 cd "$RELEASE_DIR"
-tar -czvf "$ARCHIVE_NAME" \
-    gemini-extension.json \
-    pubmed-wrapper.js \
-    package.json \
-    GEMINI.md \
-    commands \
-    node_modules \
-    pubmed-mcp
+
+# Build list of files to include
+FILES_TO_INCLUDE="gemini-extension.json pubmed-wrapper.js package.json GEMINI.md pubmed-mcp"
+
+# Add optional directories if they exist
+[ -d "commands" ] && FILES_TO_INCLUDE="$FILES_TO_INCLUDE commands"
+[ -d "node_modules" ] && FILES_TO_INCLUDE="$FILES_TO_INCLUDE node_modules"
+
+tar -czvf "$ARCHIVE_NAME" $FILES_TO_INCLUDE
 
 echo ""
 echo "Release archive created: $RELEASE_DIR/$ARCHIVE_NAME"
