@@ -1,10 +1,19 @@
 # PubMed Gemini Extension
 
+![PubMed Gemini — Research clarity, fast](docs/images/sakura-banner.svg)
+
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
 [![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
+
+PubMed Gemini is a Gemini CLI extension that searches PubMed and turns the results into evidence-weighted answers you can use right away.
+
+**TL;DR**
+- Ask in plain language, it searches 35M+ PubMed studies
+- Get a weighted evidence verdict with trust scores and links
+- Export citations to BibTeX, RIS, or EndNote
 
 ---
 
@@ -65,6 +74,35 @@ Does yoga help with anxiety?
 ```
 
 That's it! Gemini will search PubMed and give you an evidence-based answer.
+
+---
+
+## How It Works (Simple)
+
+1. You ask a question in plain language.
+2. PubMed Gemini searches PubMed for the best matches.
+3. It grades evidence quality and weighs study types.
+4. You get a clear verdict, key findings, and links.
+5. Export citations if you want to write or share.
+
+---
+
+## Quick Questions You Can Ask
+
+- "What is the most effective way to lose weight?"
+- "Should I take vitamin A, and why?"
+- "Is coffee good for heart health?"
+- "Does yoga help anxiety?"
+
+---
+
+## Screenshots
+
+![MCP tool consent prompt](docs/images/Screenshot%202026-01-25%20at%2013.41.13.png)
+
+![Search refinement output](docs/images/Screenshot%202026-01-25%20at%2013.41.57.png)
+
+![Clinical summary output](docs/images/Screenshot%202026-01-25%20at%2013.46.49.png)
 
 ---
 
