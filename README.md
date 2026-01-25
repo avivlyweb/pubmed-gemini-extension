@@ -14,7 +14,7 @@
 
 If you already have Gemini CLI installed:
 ```bash
-gemini extensions install github:avivlyweb/pubmed-gemini-extension
+gemini extensions install https://github.com/avivlyweb/pubmed-gemini-extension
 ```
 
 That's it! The extension will be ready to use.
