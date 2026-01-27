@@ -2,6 +2,8 @@
 
 ![PubMed Gemini — Research clarity, fast](docs/images/sakura-banner.svg)
 
+Nagomi (和み): calm, balanced clarity in evidence.
+
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
 [![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
@@ -15,7 +17,15 @@ PubMed Gemini is a Gemini CLI extension that searches PubMed and turns the resul
 - Get a weighted evidence verdict with trust scores and links
 - Export citations to BibTeX, RIS, or EndNote
 
----
+<details>
+<summary>Brand assets</summary>
+
+Social preview image:
+
+![PubMed Gemini social preview](docs/images/social-preview.svg)
+</details>
+
+— — —
 
 ## Installation
 
@@ -28,7 +38,7 @@ gemini extensions install https://github.com/avivlyweb/pubmed-gemini-extension
 
 That's it! The extension will be ready to use.
 
----
+— — —
 
 ### Method 2: Quick Install Script
 
@@ -43,7 +53,7 @@ curl -fsSL https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/m
 
 **Step 3:** Wait for "Installation complete!" message (about 1-2 minutes)
 
----
+— — —
 
 **Windows:**
 
@@ -59,7 +69,7 @@ irm https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/ins
 
 **Step 3:** Wait for "Installation complete!" message (about 1-2 minutes)
 
----
+— — —
 
 ## Start Using It
 
@@ -75,7 +85,7 @@ Does yoga help with anxiety?
 
 That's it! Gemini will search PubMed and give you an evidence-based answer.
 
----
+— — —
 
 ## How It Works (Simple)
 
@@ -85,7 +95,7 @@ That's it! Gemini will search PubMed and give you an evidence-based answer.
 4. You get a clear verdict, key findings, and links.
 5. Export citations if you want to write or share.
 
----
+— — —
 
 ## Quick Questions You Can Ask
 
@@ -94,17 +104,28 @@ That's it! Gemini will search PubMed and give you an evidence-based answer.
 - "Is coffee good for heart health?"
 - "Does yoga help anxiety?"
 
----
+— — —
 
 ## Screenshots
 
-![MCP tool consent prompt](docs/images/Screenshot%202026-01-25%20at%2013.41.13.png)
+<table>
+  <tr>
+    <td width="50%"><img alt="MCP tool consent prompt" src="docs/images/Screenshot%202026-01-25%20at%2013.41.13.png"/></td>
+    <td width="50%"><img alt="Search refinement output" src="docs/images/Screenshot%202026-01-25%20at%2013.41.57.png"/></td>
+  </tr>
+  <tr>
+    <td><sub>Nagomi consent: calm first-run permission</sub></td>
+    <td><sub>Refined search: quieter, sharper scope</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img alt="Clinical summary output" src="docs/images/Screenshot%202026-01-25%20at%2013.46.49.png"/></td>
+  </tr>
+  <tr>
+    <td colspan="2"><sub>Clinical summary: clear, grounded output</sub></td>
+  </tr>
+</table>
 
-![Search refinement output](docs/images/Screenshot%202026-01-25%20at%2013.41.57.png)
-
-![Clinical summary output](docs/images/Screenshot%202026-01-25%20at%2013.46.49.png)
-
----
+— — —
 
 ## What Can You Do?
 
@@ -117,7 +138,7 @@ That's it! Gemini will search PubMed and give you an evidence-based answer.
 
 **One command. PhD-level analysis. Seconds.**
 
----
+— — —
 
 ## New in v2.5 - Key Findings & Contradiction Explainer
 
@@ -160,7 +181,7 @@ CONTRADICTION ANALYSIS:
   for effectiveness, and longer treatment periods may be needed.
 ```
 
----
+— — —
 
 ## New in v2.4 - Study Snapshots & Full-Text Links
 
@@ -185,7 +206,7 @@ Direct links to read the full paper:
 | **PMC PDF** | Direct PDF download |
 | **Open Access** | Badge showing if it's free to read |
 
----
+— — —
 
 ## All Features at a Glance
 
@@ -214,7 +235,7 @@ Direct links to read the full paper:
 - **EndNote** - Native format support
 - **Clickable URLs** - All links ready to use
 
----
+— — —
 
 ## Commands
 
@@ -226,7 +247,7 @@ Direct links to read the full paper:
 | `/pubmed:analyze` | Deep-dive on one article | `/pubmed:analyze 34580864` |
 | `/pubmed:export` | Export citations | `/pubmed:export format=bibtex query="COPD exercise"` |
 
----
+— — —
 
 ## Example: Full Research Synthesis
 
@@ -296,7 +317,7 @@ Gemini: Here are your citations:
 ...
 ```
 
----
+— — —
 
 ## Who Is This For?
 
@@ -320,7 +341,7 @@ Gemini: Here are your citations:
 - Get plain-language summaries of complex studies
 - Access full-text articles when available
 
----
+— — —
 
 ## Understanding the Output
 
@@ -351,7 +372,7 @@ Gemini: Here are your citations:
 | **Neutral** | Inconclusive or needs more research |
 | **Mixed** | Some outcomes positive, others not |
 
----
+— — —
 
 ## Pro Tips
 
@@ -381,7 +402,7 @@ If 5 case reports say "no" but 1 meta-analysis says "yes", the weighted score co
 Export those top 5 articles to RIS format
 ```
 
----
+— — —
 
 ## Example Queries
 
@@ -406,7 +427,7 @@ Export those top 5 articles to RIS format
 /pubmed:synthesis HPA-axis dysfunction in treatment-resistant depression
 ```
 
----
+— — —
 
 ## Version History
 
@@ -421,7 +442,7 @@ Export those top 5 articles to RIS format
 | **2.0.0** | Enhanced PICO, 3-tier complexity detection, 10+ medical domains |
 | **1.0.0** | Core search, trust scores, basic PICO |
 
----
+— — —
 
 ## Troubleshooting
 
@@ -449,7 +470,7 @@ Then restart Gemini by closing and reopening your terminal.
 ### Need Help?
 [Open an issue on GitHub](https://github.com/avivlyweb/pubmed-gemini-extension/issues)
 
----
+— — —
 
 ## What Gets Installed?
 
@@ -462,25 +483,25 @@ Everything is installed in:
 - Mac/Linux: `~/.gemini/extensions/pubmed-gemini/`
 - Windows: `%USERPROFILE%\.gemini\extensions\pubmed-gemini\`
 
----
+— — —
 
 ## Important Note
 
 This tool is for **research and educational purposes**. Always consult qualified healthcare professionals for medical decisions.
 
----
+— — —
 
 ## Contributing
 
 Found a bug? Have an idea? [Open an issue](https://github.com/avivlyweb/pubmed-gemini-extension/issues) or submit a PR!
 
----
+— — —
 
 ## License
 
 MIT License - Free to use, modify, and distribute.
 
----
+— — —
 
 <p align="center">
   <b>Made with science by <a href="https://physiotherapy.ai/">Aviv at Avivly</a></b>
