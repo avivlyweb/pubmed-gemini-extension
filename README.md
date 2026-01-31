@@ -6,7 +6,7 @@ Nagomi (和み): calm, balanced clarity in evidence.
 
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
-[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
+[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
 
@@ -16,6 +16,7 @@ PubMed Gemini is a Gemini CLI extension that searches PubMed and turns the resul
 - Ask in plain language, it searches 35M+ PubMed studies
 - Get a weighted evidence verdict with trust scores and links
 - Export citations to BibTeX, RIS, or EndNote
+- **NEW:** Detect fake/AI-hallucinated references in PDFs
 
 <details>
 <summary>Brand assets</summary>
@@ -130,13 +131,84 @@ That's it! Gemini will search PubMed and give you an evidence-based answer.
 ## What Can You Do?
 
 | You Ask | You Get |
-|---------|---------|
+|---------|---------| 
 | "Does yoga help anxiety?" | Evidence verdict from 15+ studies with quality weighting |
 | "Find COPD exercise studies" | Ranked articles with trust scores & direct PDF links |
 | "Export those to BibTeX" | Ready-to-use citations for your paper |
 | "Is this treatment effective?" | AI synthesis with clinical bottom line |
+| "Verify references in my PDF" | Detection of fake/hallucinated citations |
 
 **One command. PhD-level analysis. Seconds.**
+
+— — —
+
+## New in v2.7 - Reference Verification (Fake Citation Detector)
+
+### Catch AI-Hallucinated References
+
+With the rise of AI-generated academic papers, fake references are becoming a serious problem. This tool verifies citations against real databases:
+
+```
+You: /pubmed:verify path/to/paper.pdf
+
+Gemini: Analyzing 74 references...
+
+VERIFICATION SUMMARY
+════════════════════════════════════════
+Total References:  74
+✅ Verified:       24 (32.4%)
+⚠️  Suspicious:     28 (37.8%)
+❌ Not Found:      22 (29.7%)
+
+FLAGGED REFERENCES:
+[3] ❌ NOT_FOUND - Ameer, W. et al. (2025)
+    → Future publication date - impossible
+[7] ❌ NOT_FOUND - Avenyo, E.K. et al. (2022)
+    → DOI does not resolve: 10.1016/j.jeep.2022.03.004
+```
+
+### What Gets Checked
+
+| Check | How It Works |
+|-------|--------------|
+| **PubMed Lookup** | Searches 35M+ articles for author/title matches |
+| **DOI Resolution** | Verifies DOI actually resolves to a real paper |
+| **CrossRef Validation** | Cross-references against CrossRef database |
+| **Year Verification** | Flags future dates or year mismatches |
+| **APA Style** | Optional check for proper APA 7th Edition formatting |
+
+### Quick Verification
+
+Check a single DOI or PMID instantly:
+
+```
+You: /pubmed:verify 10.1038/nature12373
+
+Gemini: ✅ VERIFIED (100% confidence)
+  Title: "Nanometre-scale thermometry in a living cell"
+  Found in: PubMed, CrossRef
+  DOI resolves: Yes
+```
+
+### Supported Formats
+
+| Format | Extension | Notes |
+|--------|-----------|-------|
+| PDF | `.pdf` | Extracts references section automatically |
+| Word | `.docx` | Parses document text |
+| Text | `.txt` | Raw reference list |
+| Direct | DOI/PMID | Quick single-reference check |
+
+### Real-World Example
+
+We tested this on a retracted paper from *Science of the Total Environment* (IF 8.0) that was flagged for AI-generated content:
+
+- **Claim:** 38 of 74 references were fake
+- **Our finding:** 50 of 74 (67.6%) were problematic
+- **22 references** could not be found in any database
+- **7 references** cited impossible future dates (2025)
+
+The tool detected even more issues than the original report.
 
 — — —
 
@@ -235,17 +307,26 @@ Direct links to read the full paper:
 - **EndNote** - Native format support
 - **Clickable URLs** - All links ready to use
 
+### Reference Verification
+- **Fake Citation Detection** - Verify references against PubMed/CrossRef
+- **DOI Validation** - Check if DOIs actually resolve
+- **PDF/DOCX Parsing** - Extract references from documents
+- **Batch Verification** - Check entire reference lists at once
+- **Confidence Scoring** - 0-100% likelihood reference is real
+- **HTML Reports** - Shareable verification reports
+
 — — —
 
 ## Commands
 
 | Command | Purpose | Example |
-|---------|---------|---------|
+|---------|---------|---------| 
 | Just ask naturally | Gemini understands you | "Does vitamin D help with depression?" |
 | `/pubmed:search` | Find articles on a topic | `/pubmed:search vitamin D bone health` |
 | `/pubmed:synthesis` | Full AI analysis with Evidence Compass | `/pubmed:synthesis yoga for anxiety` |
 | `/pubmed:analyze` | Deep-dive on one article | `/pubmed:analyze 34580864` |
 | `/pubmed:export` | Export citations | `/pubmed:export format=bibtex query="COPD exercise"` |
+| `/pubmed:verify` | Check references for fakes | `/pubmed:verify path/to/paper.pdf` |
 
 — — —
 
@@ -341,6 +422,11 @@ Gemini: Here are your citations:
 - Get plain-language summaries of complex studies
 - Access full-text articles when available
 
+### Journal Editors & Peer Reviewers
+- Verify reference lists before publication
+- Detect AI-generated papers with fake citations
+- Generate verification reports for editorial decisions
+
 — — —
 
 ## Understanding the Output
@@ -433,6 +519,7 @@ Export those top 5 articles to RIS format
 
 | Version | Features |
 |---------|----------|
+| **2.7.0** | Reference Verification Tool - detect fake/AI-hallucinated citations in PDFs |
 | **2.6.0** | Official Gemini CLI install support, GitHub Releases distribution |
 | **2.5.0** | Key Findings Extraction (effect sizes, p-values, CIs), Contradiction Explainer |
 | **2.4.0** | Study Snapshots, Full-Text Links (PMC/PDF), Open Access detection |
