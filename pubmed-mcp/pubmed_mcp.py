@@ -3306,6 +3306,8 @@ class MCPServer:
             "analyze_article_trustworthiness": self._handle_analyze_trustworthiness,
             "generate_research_summary": self._handle_research_summary,
             "export_citations": self._handle_export_citations,
+            # v2.7.0: Reference verification tool
+            "verify_references": self._handle_verify_references,
         }
     
     def get_tools_list(self) -> List[Dict[str, Any]]:
@@ -3415,6 +3417,44 @@ class MCPServer:
                         }
                     },
                     "required": ["format"]
+                }
+            },
+            # v2.7.0: Reference Verification Tool
+            {
+                "name": "verify_references",
+                "description": (
+                    "Verify academic paper references for existence and APA 7th formatting. "
+                    "Checks references against PubMed, DOI.org, and CrossRef databases. "
+                    "Detects AI-hallucinated/fake citations. Supports PDF, DOCX, and text files."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to PDF, DOCX, or TXT file containing references"
+                        },
+                        "references_text": {
+                            "type": "string",
+                            "description": "Raw text containing references (alternative to file_path)"
+                        },
+                        "check_existence": {
+                            "type": "boolean",
+                            "description": "Check if references exist in PubMed/DOI/CrossRef",
+                            "default": True
+                        },
+                        "check_apa_style": {
+                            "type": "boolean",
+                            "description": "Validate APA 7th Edition formatting",
+                            "default": True
+                        },
+                        "output_format": {
+                            "type": "string",
+                            "enum": ["terminal", "json", "html"],
+                            "description": "Report output format",
+                            "default": "terminal"
+                        }
+                    }
                 }
             }
         ]
@@ -3659,6 +3699,188 @@ class MCPServer:
             "usage_hint": f"Copy the 'citations' content and save to a file with {extensions.get(format_type, '.txt')} extension"
         }
     
+    async def _handle_verify_references(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle reference verification (v2.7.0).
+        
+        Verifies academic paper references for:
+        - Existence in PubMed, DOI.org, and CrossRef
+        - APA 7th Edition style compliance
+        - Detection of AI-hallucinated/fake citations
+        """
+        from reference_checker import (
+            DocumentParser, ReferenceExtractor, VerificationEngine,
+            APAChecker, ReportGenerator, VerificationReport, ReferenceReport
+        )
+        from datetime import datetime
+        
+        file_path = args.get("file_path")
+        references_text = args.get("references_text")
+        check_existence = args.get("check_existence", True)
+        check_apa_style = args.get("check_apa_style", True)
+        output_format = args.get("output_format", "terminal")
+        
+        # Initialize components
+        extractor = ReferenceExtractor()
+        apa_checker = APAChecker()
+        report_generator = ReportGenerator()
+        
+        reference_entries = []
+        document_name = "References"
+        parsing_warnings = []
+        
+        try:
+            # Parse document or use raw text
+            if file_path:
+                parser = DocumentParser()
+                doc_content = parser.parse(file_path)
+                reference_entries = doc_content.reference_entries
+                document_name = doc_content.file_path.split("/")[-1]
+                parsing_warnings = doc_content.extraction_warnings
+            elif references_text:
+                # Split text into entries
+                lines = references_text.strip().split("\n\n")
+                reference_entries = [line.strip() for line in lines if line.strip()]
+                document_name = "Provided Text"
+            else:
+                return {
+                    "error": "Either file_path or references_text must be provided",
+                    "status": "error"
+                }
+            
+            if not reference_entries:
+                return {
+                    "error": "No references found in the provided input",
+                    "status": "error",
+                    "parsing_warnings": parsing_warnings
+                }
+            
+            # Parse references
+            parsed_refs = extractor.extract_batch(reference_entries)
+            
+            # Verify existence
+            verification_results = []
+            verified_count = 0
+            suspicious_count = 0
+            not_found_count = 0
+            error_count = 0
+            
+            if check_existence:
+                engine = VerificationEngine(pubmed_client=self.pubmed_client)
+                try:
+                    verification_results = await engine.verify_batch(parsed_refs)
+                    
+                    for result in verification_results:
+                        if result.status.value == "VERIFIED":
+                            verified_count += 1
+                        elif result.status.value == "SUSPICIOUS":
+                            suspicious_count += 1
+                        elif result.status.value == "NOT_FOUND":
+                            not_found_count += 1
+                        else:
+                            error_count += 1
+                finally:
+                    # Don't close engine since we're using shared pubmed_client
+                    pass
+            
+            # Check APA style
+            apa_results = []
+            apa_errors_total = 0
+            apa_warnings_total = 0
+            apa_issues_by_type = {}
+            
+            if check_apa_style:
+                for ref in parsed_refs:
+                    issues = apa_checker.check(ref)
+                    apa_results.append(issues)
+                    for issue in issues:
+                        if issue.severity.value == "error":
+                            apa_errors_total += 1
+                        else:
+                            apa_warnings_total += 1
+                        apa_issues_by_type[issue.field] = apa_issues_by_type.get(issue.field, 0) + 1
+            
+            # Build reference reports
+            ref_reports = []
+            for i, ref in enumerate(parsed_refs):
+                ver_result = verification_results[i] if i < len(verification_results) else None
+                apa_issues = apa_results[i] if i < len(apa_results) else []
+                
+                ref_report = ReferenceReport(
+                    reference_number=ref.reference_number,
+                    raw_citation=ref.raw_text[:200] + "..." if len(ref.raw_text) > 200 else ref.raw_text,
+                    verification_status=ver_result.status.value if ver_result else "NOT_CHECKED",
+                    confidence=ver_result.confidence if ver_result else 0.0,
+                    pubmed_pmid=ver_result.pubmed_match.pmid if ver_result and ver_result.pubmed_match else None,
+                    doi_valid=ver_result.doi_valid if ver_result else None,
+                    discrepancies=ver_result.discrepancies if ver_result else [],
+                    apa_errors=sum(1 for i in apa_issues if i.severity.value == "error"),
+                    apa_warnings=sum(1 for i in apa_issues if i.severity.value == "warning"),
+                    apa_issues=[{"field": i.field, "severity": i.severity.value, "message": i.message, "suggestion": i.suggestion} for i in apa_issues]
+                )
+                ref_reports.append(ref_report)
+            
+            # Create report
+            report = VerificationReport(
+                document_name=document_name,
+                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                total_references=len(parsed_refs),
+                verified_count=verified_count,
+                suspicious_count=suspicious_count,
+                not_found_count=not_found_count,
+                error_count=error_count,
+                references=ref_reports,
+                apa_errors_total=apa_errors_total,
+                apa_warnings_total=apa_warnings_total,
+                apa_issues_by_type=apa_issues_by_type,
+                parsing_warnings=parsing_warnings
+            )
+            
+            # Generate output
+            formatted_report = report_generator.generate(report, output_format)
+            
+            return {
+                "status": "success",
+                "document": document_name,
+                "summary": {
+                    "total_references": len(parsed_refs),
+                    "verified": verified_count,
+                    "suspicious": suspicious_count,
+                    "not_found": not_found_count,
+                    "verification_rate": f"{(verified_count / max(len(parsed_refs), 1)) * 100:.1f}%",
+                    "apa_errors": apa_errors_total,
+                    "apa_warnings": apa_warnings_total
+                },
+                "report": formatted_report,
+                "flagged_references": [
+                    {
+                        "number": r.reference_number,
+                        "status": r.verification_status,
+                        "confidence": r.confidence,
+                        "citation": r.raw_citation,
+                        "issues": r.discrepancies
+                    }
+                    for r in ref_reports
+                    if r.verification_status in ["SUSPICIOUS", "NOT_FOUND"]
+                ]
+            }
+            
+        except ImportError as e:
+            return {
+                "error": f"Missing dependency: {str(e)}. Install with: pip install PyMuPDF python-docx",
+                "status": "error"
+            }
+        except FileNotFoundError as e:
+            return {
+                "error": f"File not found: {str(e)}",
+                "status": "error"
+            }
+        except Exception as e:
+            return {
+                "error": f"Verification failed: {str(e)}",
+                "status": "error"
+            }
+    
     async def handle_request(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle incoming JSON-RPC request"""
         method = request.get("method", "")
@@ -3674,7 +3896,7 @@ class MCPServer:
                     },
                     "serverInfo": {
                         "name": "pubmed-research-mcp",
-                        "version": "2.6.0"
+                        "version": "2.7.0"
                     }
                 }
             elif method == "notifications/initialized":

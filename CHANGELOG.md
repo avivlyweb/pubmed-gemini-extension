@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.0] - 2025-01-31
+
+### Added
+
+#### Reference Verification Tool (New Feature)
+Detect fake/AI-hallucinated references in academic papers and validate APA formatting:
+
+- **`verify_references` MCP Tool**: New tool for verifying citations
+  - Checks reference existence in PubMed, DOI.org, and CrossRef
+  - Validates APA 7th Edition formatting
+  - Supports PDF, DOCX, and plain text files
+  - Batch mode for checking multiple documents
+  - Caching for efficient verification
+
+- **Multi-Source Verification**:
+  - PubMed database search (reuses existing infrastructure)
+  - DOI resolution checking (HTTP HEAD to doi.org)
+  - CrossRef API fallback for non-medical papers
+  - Fuzzy matching with confidence scoring
+
+- **Verification Status**:
+  - `VERIFIED` (>=80% confidence): High confidence match found
+  - `SUSPICIOUS` (50-79% confidence): Partial match with discrepancies
+  - `NOT_FOUND` (<50% confidence): Likely fake/hallucinated
+
+- **APA 7th Edition Style Checker**:
+  - Author format validation (Last, F. M.)
+  - Year format check ((2023).)
+  - Title case validation (sentence case)
+  - DOI format check (https://doi.org/ preferred)
+  - Missing field detection
+
+- **Multi-Format Reports**:
+  - Terminal: Rich ANSI-colored output
+  - JSON: Machine-parseable format
+  - HTML: Professional styled report
+  - PDF: Via HTML conversion (optional)
+
+- **`/pubmed:verify` Slash Command**: Quick access to verification
+
+### Technical
+- Added `reference_checker/` module with 5 components:
+  - `document_parser.py`: PDF/DOCX/TXT extraction
+  - `reference_extractor.py`: Citation parsing
+  - `verification_engine.py`: Multi-source verification
+  - `apa_checker.py`: APA 7th validation
+  - `report_generator.py`: Multi-format output
+- Added comprehensive test suite (`test_reference_checker.py`)
+- Added regression tests (`test_regression.py`) to protect existing functionality
+- Updated requirements.txt with PyMuPDF and python-docx dependencies
+
+### Notes
+- **Zero changes to existing tools**: All existing functionality unchanged
+- Existing tools (`enhanced_pubmed_search`, `analyze_article_trustworthiness`, `generate_research_summary`, `export_citations`) work exactly as before
+- Reference checker reuses existing `PubMedClient` for efficient queries
+
+---
+
 ## [2.2.0] - 2025-01-19
 
 ### Added
