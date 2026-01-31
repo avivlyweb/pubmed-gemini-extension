@@ -87,6 +87,103 @@ class ReportGenerator:
     RESET_COLOR = "\033[0m"
     BOLD = "\033[1m"
     
+    def build_report(self, 
+                     verification_results: List[Any],
+                     document_name: str = "Unknown Document",
+                     raw_citations: Optional[List[str]] = None,
+                     apa_results: Optional[List[Any]] = None,
+                     parsing_warnings: Optional[List[str]] = None) -> VerificationReport:
+        """
+        Build a VerificationReport from raw verification results.
+        
+        Args:
+            verification_results: List of VerificationResult objects from VerificationEngine
+            document_name: Name of the source document
+            raw_citations: Original citation strings (parallel to results)
+            apa_results: List of APACheckResult objects (parallel to results)
+            parsing_warnings: Any warnings from parsing stage
+            
+        Returns:
+            VerificationReport ready for rendering
+        """
+        from datetime import datetime
+        
+        # Count by status
+        verified = suspicious = not_found = errors = 0
+        reference_reports = []
+        apa_errors_total = 0
+        apa_warnings_total = 0
+        apa_by_type: Dict[str, int] = {}
+        
+        for i, result in enumerate(verification_results):
+            status = result.status.value if hasattr(result.status, 'value') else str(result.status)
+            
+            if status == "VERIFIED":
+                verified += 1
+            elif status == "SUSPICIOUS":
+                suspicious += 1
+            elif status == "NOT_FOUND":
+                not_found += 1
+            else:
+                errors += 1
+            
+            # Build individual reference report
+            raw_citation = raw_citations[i] if raw_citations and i < len(raw_citations) else ""
+            
+            # Get APA info if available
+            apa_issues = []
+            apa_err = 0
+            apa_warn = 0
+            if apa_results and i < len(apa_results):
+                apa_result = apa_results[i]
+                if hasattr(apa_result, 'issues'):
+                    for issue in apa_result.issues:
+                        severity = issue.severity.value if hasattr(issue.severity, 'value') else str(issue.severity)
+                        apa_issues.append({
+                            'message': issue.message,
+                            'field': issue.field if hasattr(issue, 'field') else None,
+                            'severity': severity
+                        })
+                        if severity == 'error':
+                            apa_err += 1
+                            apa_errors_total += 1
+                        else:
+                            apa_warn += 1
+                            apa_warnings_total += 1
+                        
+                        # Count by type
+                        issue_type = issue.issue_type.value if hasattr(issue.issue_type, 'value') else 'unknown'
+                        apa_by_type[issue_type] = apa_by_type.get(issue_type, 0) + 1
+            
+            ref_report = ReferenceReport(
+                reference_number=i + 1,
+                raw_citation=raw_citation[:200] + "..." if len(raw_citation) > 200 else raw_citation,
+                verification_status=status,
+                confidence=result.confidence,
+                pubmed_pmid=result.pmid if hasattr(result, 'pmid') else None,
+                doi_valid=result.doi_valid if hasattr(result, 'doi_valid') else None,
+                discrepancies=result.discrepancies if hasattr(result, 'discrepancies') else [],
+                apa_errors=apa_err,
+                apa_warnings=apa_warn,
+                apa_issues=apa_issues
+            )
+            reference_reports.append(ref_report)
+        
+        return VerificationReport(
+            document_name=document_name,
+            timestamp=datetime.now().isoformat(),
+            total_references=len(verification_results),
+            verified_count=verified,
+            suspicious_count=suspicious,
+            not_found_count=not_found,
+            error_count=errors,
+            references=reference_reports,
+            apa_errors_total=apa_errors_total,
+            apa_warnings_total=apa_warnings_total,
+            apa_issues_by_type=apa_by_type,
+            parsing_warnings=parsing_warnings or []
+        )
+    
     def generate(self, report: VerificationReport, 
                  format: Literal["terminal", "json", "html", "pdf"] = "terminal") -> str:
         """

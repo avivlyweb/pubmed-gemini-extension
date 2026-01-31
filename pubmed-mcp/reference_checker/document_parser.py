@@ -273,6 +273,7 @@ class DocumentParser:
         Handles:
         - Numbered references: [1], 1., (1)
         - APA style (author-date)
+        - Elsevier/academic format: Author, A., Author, B., Year. Title...
         - Hanging indent style
         """
         if not refs_text:
@@ -282,30 +283,65 @@ class DocumentParser:
         
         # Try numbered patterns first: [1], [2], etc.
         numbered_bracket = re.split(r"\n\s*\[\d+\]\s*", refs_text)
-        if len(numbered_bracket) > 2:
+        if len(numbered_bracket) > 5:  # Must have at least 5 to be real
             entries = [e.strip() for e in numbered_bracket if e.strip()]
             return entries
         
         # Try numbered with period: 1., 2., etc.
         numbered_period = re.split(r"\n\s*\d+\.\s+", refs_text)
-        if len(numbered_period) > 2:
+        if len(numbered_period) > 5:
             entries = [e.strip() for e in numbered_period if e.strip()]
             return entries
         
         # Try numbered in parentheses: (1), (2), etc.
+        # Need stricter matching - at least 10 entries to be considered valid
         numbered_paren = re.split(r"\n\s*\(\d+\)\s*", refs_text)
-        if len(numbered_paren) > 2:
+        if len(numbered_paren) > 10:
             entries = [e.strip() for e in numbered_paren if e.strip()]
+            return entries
+        
+        # For Elsevier/academic format without numbering:
+        # Use line-by-line approach - look for author pattern at start of lines
+        lines = refs_text.split('\n')
+        entries = []
+        current_entry = []
+        
+        # Pattern for start of a new reference: AuthorName, Initial.
+        new_ref_pattern = re.compile(r'^[A-Z][a-z]+(?:[-\'][A-Z][a-z]+)?,\s+[A-Z]\.')
+        
+        for line in lines:
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+            
+            # Check if this line starts a new reference
+            if new_ref_pattern.match(line_stripped) and current_entry:
+                # Save the previous entry
+                entry_text = ' '.join(current_entry)
+                if len(entry_text) > 30:  # Minimum reasonable reference length
+                    entries.append(entry_text)
+                current_entry = [line_stripped]
+            else:
+                current_entry.append(line_stripped)
+        
+        # Don't forget the last entry
+        if current_entry:
+            entry_text = ' '.join(current_entry)
+            if len(entry_text) > 30:
+                entries.append(entry_text)
+        
+        # If we found enough entries, return them
+        if len(entries) > 3:
             return entries
         
         # Try splitting by blank lines (common in APA)
         blank_line_split = re.split(r"\n\s*\n", refs_text)
-        if len(blank_line_split) > 1:
-            entries = [e.strip() for e in blank_line_split if e.strip()]
-            return entries
+        if len(blank_line_split) > 3:
+            entries = [e.strip() for e in blank_line_split if e.strip() and len(e.strip()) > 30]
+            if len(entries) > 3:
+                return entries
         
-        # Try detecting APA author-year pattern at start of lines
-        # Pattern: Author, A. A. (Year). or Author, A. A., & Author, B. B. (Year).
+        # Fallback: Try APA pattern split
         apa_pattern = r"\n(?=[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?,\s+[A-Z]\.)"
         apa_split = re.split(apa_pattern, refs_text)
         if len(apa_split) > 1:
