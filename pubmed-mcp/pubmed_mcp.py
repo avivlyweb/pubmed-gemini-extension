@@ -3438,6 +3438,10 @@ class MCPServer:
                             "type": "string",
                             "description": "Raw text containing references (alternative to file_path)"
                         },
+                        "identifier": {
+                            "type": "string",
+                            "description": "DOI (e.g., '10.1234/abc') or PMID (e.g., '12345678') or URL for quick single-reference lookup"
+                        },
                         "check_existence": {
                             "type": "boolean",
                             "description": "Check if references exist in PubMed/DOI/CrossRef",
@@ -3707,18 +3711,33 @@ class MCPServer:
         - Existence in PubMed, DOI.org, and CrossRef
         - APA 7th Edition style compliance
         - Detection of AI-hallucinated/fake citations
+        
+        Also supports direct DOI/PMID lookup for quick verification.
         """
         from reference_checker import (
             DocumentParser, ReferenceExtractor, VerificationEngine,
             APAChecker, ReportGenerator, VerificationReport, ReferenceReport
         )
         from datetime import datetime
+        import re
         
         file_path = args.get("file_path")
         references_text = args.get("references_text")
+        identifier = args.get("identifier")  # DOI, PMID, or URL
         check_existence = args.get("check_existence", True)
         check_apa_style = args.get("check_apa_style", True)
         output_format = args.get("output_format", "terminal")
+        
+        # Handle direct DOI/PMID lookup
+        if identifier:
+            return await self._handle_identifier_lookup(identifier)
+        
+        # Also check if references_text contains a single DOI/PMID
+        if references_text and not file_path:
+            text = references_text.strip()
+            lookup_result = await self._try_identifier_lookup(text)
+            if lookup_result:
+                return lookup_result
         
         # Initialize components
         extractor = ReferenceExtractor()
@@ -3880,6 +3899,212 @@ class MCPServer:
                 "error": f"Verification failed: {str(e)}",
                 "status": "error"
             }
+    
+    async def _try_identifier_lookup(self, text: str) -> Optional[Dict[str, Any]]:
+        """
+        Check if text is a DOI, PMID, or URL and perform lookup if so.
+        Returns None if text is not a recognizable identifier.
+        """
+        import re
+        
+        text = text.strip()
+        
+        # Check for PMID (just numbers, 1-8 digits)
+        if re.match(r'^\d{1,8}$', text):
+            return await self._handle_identifier_lookup(text)
+        
+        # Check for PMID with prefix
+        pmid_match = re.match(r'^(?:PMID:?\s*|pmid:?\s*)(\d{1,8})$', text, re.IGNORECASE)
+        if pmid_match:
+            return await self._handle_identifier_lookup(pmid_match.group(1))
+        
+        # Check for DOI
+        doi_match = re.search(r'(10\.\d{4,}/[^\s]+)', text)
+        if doi_match:
+            return await self._handle_identifier_lookup(doi_match.group(1))
+        
+        # Check for DOI URL
+        doi_url_match = re.match(r'^https?://(?:dx\.)?doi\.org/(10\.\d{4,}/[^\s]+)', text)
+        if doi_url_match:
+            return await self._handle_identifier_lookup(doi_url_match.group(1))
+        
+        # Check for PubMed URL
+        pubmed_url_match = re.match(r'^https?://(?:www\.)?(?:pubmed\.ncbi\.nlm\.nih\.gov|ncbi\.nlm\.nih\.gov/pubmed)/(\d+)', text)
+        if pubmed_url_match:
+            return await self._handle_identifier_lookup(pubmed_url_match.group(1))
+        
+        return None
+    
+    async def _handle_identifier_lookup(self, identifier: str) -> Dict[str, Any]:
+        """
+        Look up a single article by DOI or PMID.
+        
+        Args:
+            identifier: DOI (10.xxxx/...) or PMID (numeric)
+        
+        Returns:
+            Article details and verification status
+        """
+        import re
+        
+        identifier = identifier.strip()
+        is_doi = identifier.startswith('10.')
+        is_pmid = identifier.isdigit()
+        
+        result = {
+            "status": "success",
+            "lookup_type": "doi" if is_doi else "pmid" if is_pmid else "unknown",
+            "identifier": identifier,
+            "found": False,
+            "article": None,
+            "verification": None
+        }
+        
+        try:
+            if is_pmid:
+                # Direct PMID lookup
+                article = await self.pubmed_client.fetch_article(identifier)
+                
+                if article:
+                    trust = self.trust_analyzer.analyze(article)
+                    links = generate_full_text_links(article)
+                    snapshot = self.snapshot_generator.generate(article)
+                    
+                    result["found"] = True
+                    result["article"] = {
+                        "pmid": article.pmid,
+                        "title": article.title,
+                        "authors": article.authors,
+                        "journal": article.journal,
+                        "pub_date": article.pub_date,
+                        "abstract": article.abstract[:500] + "..." if len(article.abstract) > 500 else article.abstract,
+                        "doi": article.doi,
+                        "snapshot": snapshot.summary,
+                        "links": links.to_dict()
+                    }
+                    result["verification"] = {
+                        "status": "VERIFIED",
+                        "confidence": 1.0,
+                        "trust_score": trust.overall_score,
+                        "evidence_grade": trust.evidence_grade,
+                        "study_design": trust.study_design
+                    }
+                    result["message"] = f"Article found in PubMed: {article.title[:60]}..."
+                else:
+                    result["verification"] = {
+                        "status": "NOT_FOUND",
+                        "confidence": 0.0
+                    }
+                    result["message"] = f"PMID {identifier} not found in PubMed"
+            
+            elif is_doi:
+                # DOI lookup - first check if it resolves
+                import httpx
+                
+                doi_valid = False
+                crossref_data = None
+                
+                # Check DOI resolution
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.head(
+                            f"https://doi.org/{identifier}",
+                            follow_redirects=True
+                        )
+                        doi_valid = response.status_code == 200
+                except Exception:
+                    doi_valid = False
+                
+                # Try to get metadata from CrossRef
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.get(
+                            f"https://api.crossref.org/works/{identifier}",
+                            headers={"User-Agent": "PubMedGemini/2.7.0"}
+                        )
+                        if response.status_code == 200:
+                            crossref_data = response.json().get("message", {})
+                except Exception:
+                    pass
+                
+                # Also search PubMed by DOI
+                pmid = None
+                article = None
+                try:
+                    pmids = await self.pubmed_client.search(f"{identifier}[DOI]", max_results=1)
+                    if pmids:
+                        pmid = pmids[0]
+                        article = await self.pubmed_client.fetch_article(pmid)
+                except Exception:
+                    pass
+                
+                if doi_valid:
+                    result["found"] = True
+                    result["verification"] = {
+                        "status": "VERIFIED",
+                        "confidence": 1.0 if article else 0.9,
+                        "doi_resolves": True,
+                        "in_pubmed": article is not None,
+                        "in_crossref": crossref_data is not None
+                    }
+                    
+                    # Build article info from available sources
+                    if article:
+                        trust = self.trust_analyzer.analyze(article)
+                        links = generate_full_text_links(article)
+                        
+                        result["article"] = {
+                            "pmid": article.pmid,
+                            "title": article.title,
+                            "authors": article.authors,
+                            "journal": article.journal,
+                            "pub_date": article.pub_date,
+                            "doi": identifier,
+                            "links": links.to_dict()
+                        }
+                        result["verification"]["trust_score"] = trust.overall_score
+                        result["verification"]["evidence_grade"] = trust.evidence_grade
+                        result["message"] = f"DOI verified. Article found in PubMed: {article.title[:50]}..."
+                    
+                    elif crossref_data:
+                        title = crossref_data.get("title", ["Unknown"])[0] if crossref_data.get("title") else "Unknown"
+                        authors = [
+                            f"{a.get('given', '')} {a.get('family', '')}".strip()
+                            for a in crossref_data.get("author", [])[:5]
+                        ]
+                        journal = crossref_data.get("container-title", ["Unknown"])[0] if crossref_data.get("container-title") else "Unknown"
+                        
+                        result["article"] = {
+                            "title": title,
+                            "authors": authors,
+                            "journal": journal,
+                            "doi": identifier,
+                            "links": {
+                                "doi": f"https://doi.org/{identifier}"
+                            }
+                        }
+                        result["message"] = f"DOI verified via CrossRef: {title[:50]}..."
+                    else:
+                        result["message"] = f"DOI {identifier} resolves but no metadata found"
+                else:
+                    result["found"] = False
+                    result["verification"] = {
+                        "status": "NOT_FOUND",
+                        "confidence": 0.0,
+                        "doi_resolves": False
+                    }
+                    result["message"] = f"DOI {identifier} does not resolve - may be fake or incorrect"
+            
+            else:
+                result["status"] = "error"
+                result["message"] = f"Could not identify '{identifier}' as DOI or PMID"
+        
+        except Exception as e:
+            result["status"] = "error"
+            result["error"] = str(e)
+            result["message"] = f"Lookup failed: {str(e)}"
+        
+        return result
     
     async def handle_request(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle incoming JSON-RPC request"""
