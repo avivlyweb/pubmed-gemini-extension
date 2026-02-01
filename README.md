@@ -21,6 +21,8 @@ PubMed Gemini is a Gemini CLI extension that searches PubMed and turns the resul
 <details>
 <summary>Brand assets</summary>
 
+**和み (Nagomi):** A Japanese concept of calm harmony. In research, it means cutting through noise to find what matters.
+
 Social preview image:
 
 ![PubMed Gemini social preview](docs/images/social-preview.svg)
@@ -571,9 +573,9 @@ Everything is installed in:
 
 — — —
 
-## Important Note
+## A Gentle Reminder
 
-This tool is for **research and educational purposes**. Always consult qualified healthcare professionals for medical decisions.
+This tool supports **research and learning** — it does not replace professional medical advice. Always consult qualified healthcare professionals for health decisions.
 
 — — —
 
@@ -590,7 +592,9 @@ MIT License - Free to use, modify, and distribute.
 — — —
 
 <p align="center">
-  <b>Made with science by <a href="https://physiotherapy.ai/">Aviv at Avivly</a></b>
+  <b>Crafted with 和み by <a href="https://physiotherapy.ai/">Aviv at Avivly</a></b>
   <br><br>
   Searching 35+ million studies so you don't have to.
+  <br>
+  <sub>和み — clarity without the noise.</sub>
 </p>
