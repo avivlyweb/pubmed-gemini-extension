@@ -4,6 +4,7 @@
  * PubMed MCP Server Wrapper for Gemini CLI
  * Spawns the Python MCP server as a child process
  * 
+ * v2.7.0: Install all dependencies from requirements.txt (PyMuPDF, python-docx)
  * v2.6.0: Added lazy venv creation for GitHub Releases distribution
  * Made by Aviv at Avivly (physiotherapy.ai)
  */
@@ -71,12 +72,26 @@ async function ensureVenvExists() {
       ? join(venvDir, 'Scripts', 'pip.exe')
       : join(venvDir, 'bin', 'pip');
 
-    // Install dependencies
-    console.error('    Installing dependencies...');
+    // Install dependencies from requirements.txt (includes httpx, PyMuPDF, python-docx)
+    console.error('    Installing dependencies (this may take a minute)...');
     execSync(`"${pipPath}" install --quiet --upgrade pip`, { 
       cwd: mcpDir, 
       stdio: 'pipe' 
     });
+    
+    // Check if requirements.txt exists and install from it
+    if (existsSync(requirementsPath)) {
+      execSync(`"${pipPath}" install --quiet -r "${requirementsPath}"`, { 
+        cwd: mcpDir, 
+        stdio: 'pipe' 
+      });
+    } else {
+      // Fallback: install minimum required packages
+      execSync(`"${pipPath}" install --quiet httpx PyMuPDF python-docx`, { 
+        cwd: mcpDir, 
+        stdio: 'pipe' 
+      });
+    }
     execSync(`"${pipPath}" install --quiet httpx`, { 
       cwd: mcpDir, 
       stdio: 'pipe' 
