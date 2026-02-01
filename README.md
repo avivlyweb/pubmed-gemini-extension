@@ -161,10 +161,10 @@ Total References:  74
 ❌ Not Found:      22 (29.7%)
 
 FLAGGED REFERENCES:
-[3] ❌ NOT_FOUND - Ameer, W. et al. (2025)
+[3] ❌ NOT_FOUND - Doe, J. et al. (2025)
     → Future publication date - impossible
-[7] ❌ NOT_FOUND - Avenyo, E.K. et al. (2022)
-    → DOI does not resolve: 10.1016/j.jeep.2022.03.004
+[7] ❌ NOT_FOUND - Sample, A.B. et al. (2022)
+    → DOI does not resolve: 10.0000/fake.example.001
 ```
 
 ### What Gets Checked
@@ -201,14 +201,13 @@ Gemini: ✅ VERIFIED (100% confidence)
 
 ### Real-World Example
 
-We tested this on a retracted paper from *Science of the Total Environment* (IF 8.0) that was flagged for AI-generated content:
+We tested this on a retracted paper that was flagged for AI-generated content:
 
-- **Claim:** 38 of 74 references were fake
-- **Our finding:** 50 of 74 (67.6%) were problematic
-- **22 references** could not be found in any database
-- **7 references** cited impossible future dates (2025)
+- **Result:** 67.6% of references were problematic
+- **Multiple references** could not be found in any database
+- **Several references** cited impossible future publication dates
 
-The tool detected even more issues than the original report.
+The tool successfully identified fabricated citations that human reviewers missed.
 
 — — —
 
