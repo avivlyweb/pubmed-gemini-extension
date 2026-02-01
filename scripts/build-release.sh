@@ -31,8 +31,11 @@ cp "$PROJECT_ROOT/pubmed-gemini/package.json" "$RELEASE_DIR/"
 # GEMINI.md for context
 cp "$PROJECT_ROOT/pubmed-gemini/GEMINI.md" "$RELEASE_DIR/"
 
-# Commands directory (if exists)
-if [ -d "$PROJECT_ROOT/pubmed-gemini/commands" ]; then
+# Commands directory - prefer root commands/ folder, fallback to pubmed-gemini/commands
+if [ -d "$PROJECT_ROOT/commands" ]; then
+    echo "Copying commands from root..."
+    cp -r "$PROJECT_ROOT/commands" "$RELEASE_DIR/"
+elif [ -d "$PROJECT_ROOT/pubmed-gemini/commands" ]; then
     cp -r "$PROJECT_ROOT/pubmed-gemini/commands" "$RELEASE_DIR/"
 fi
 
@@ -47,6 +50,12 @@ echo "Copying Python MCP server..."
 mkdir -p "$RELEASE_DIR/pubmed-mcp"
 cp "$PROJECT_ROOT/pubmed-mcp/pubmed_mcp.py" "$RELEASE_DIR/pubmed-mcp/"
 cp "$PROJECT_ROOT/pubmed-mcp/requirements.txt" "$RELEASE_DIR/pubmed-mcp/"
+
+# Copy reference_checker module (v2.7.0+)
+if [ -d "$PROJECT_ROOT/pubmed-mcp/reference_checker" ]; then
+    echo "Copying reference_checker module..."
+    cp -r "$PROJECT_ROOT/pubmed-mcp/reference_checker" "$RELEASE_DIR/pubmed-mcp/"
+fi
 
 # Copy test files (optional, for verification)
 if [ -f "$PROJECT_ROOT/pubmed-mcp/test_query.py" ]; then
