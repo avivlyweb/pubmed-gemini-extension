@@ -3782,6 +3782,8 @@ class MCPServer:
             verified_count = 0
             suspicious_count = 0
             not_found_count = 0
+            definite_fake_count = 0
+            likely_valid_count = 0
             error_count = 0
             
             if check_existence:
@@ -3796,6 +3798,10 @@ class MCPServer:
                             suspicious_count += 1
                         elif result.status.value == "NOT_FOUND":
                             not_found_count += 1
+                        elif result.status.value == "DEFINITE_FAKE":
+                            definite_fake_count += 1
+                        elif result.status.value == "LIKELY_VALID":
+                            likely_valid_count += 1
                         else:
                             error_count += 1
                 finally:
@@ -3833,6 +3839,9 @@ class MCPServer:
                     pubmed_pmid=ver_result.pubmed_match.pmid if ver_result and ver_result.pubmed_match else None,
                     doi_valid=ver_result.doi_valid if ver_result else None,
                     discrepancies=ver_result.discrepancies if ver_result else [],
+                    fake_indicators=ver_result.fake_indicators if ver_result and hasattr(ver_result, 'fake_indicators') else [],
+                    false_positive_warnings=ver_result.false_positive_warnings if ver_result and hasattr(ver_result, 'false_positive_warnings') else [],
+                    manual_verify_links=ver_result.manual_verify_links if ver_result and hasattr(ver_result, 'manual_verify_links') else {},
                     apa_errors=sum(1 for i in apa_issues if i.severity.value == "error"),
                     apa_warnings=sum(1 for i in apa_issues if i.severity.value == "warning"),
                     apa_issues=[{"field": i.field, "severity": i.severity.value, "message": i.message, "suggestion": i.suggestion} for i in apa_issues]
@@ -3848,6 +3857,8 @@ class MCPServer:
                 suspicious_count=suspicious_count,
                 not_found_count=not_found_count,
                 error_count=error_count,
+                definite_fake_count=definite_fake_count,
+                likely_valid_count=likely_valid_count,
                 references=ref_reports,
                 apa_errors_total=apa_errors_total,
                 apa_warnings_total=apa_warnings_total,
@@ -3866,6 +3877,8 @@ class MCPServer:
                     "verified": verified_count,
                     "suspicious": suspicious_count,
                     "not_found": not_found_count,
+                    "definite_fake": definite_fake_count,
+                    "likely_valid": likely_valid_count,
                     "verification_rate": f"{(verified_count / max(len(parsed_refs), 1)) * 100:.1f}%",
                     "apa_errors": apa_errors_total,
                     "apa_warnings": apa_warnings_total
@@ -3877,10 +3890,11 @@ class MCPServer:
                         "status": r.verification_status,
                         "confidence": r.confidence,
                         "citation": r.raw_citation,
-                        "issues": r.discrepancies
+                        "issues": r.discrepancies,
+                        "fake_indicators": r.fake_indicators if hasattr(r, 'fake_indicators') else []
                     }
                     for r in ref_reports
-                    if r.verification_status in ["SUSPICIOUS", "NOT_FOUND"]
+                    if r.verification_status in ["DEFINITE_FAKE", "SUSPICIOUS", "NOT_FOUND"]
                 ]
             }
             
