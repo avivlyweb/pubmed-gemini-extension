@@ -6,7 +6,7 @@ Nagomi (和み): calm, balanced clarity in evidence.
 
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
+[![Version](https://img.shields.io/badge/version-2.7.1-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
 
@@ -159,38 +159,77 @@ VERIFICATION SUMMARY
 ════════════════════════════════════════
 Total References:  74
 ✅ Verified:       24 (32.4%)
-⚠️  Suspicious:     28 (37.8%)
-❌ Not Found:      22 (29.7%)
+🚨 Definite Fake:   5 (6.8%)
+⚠️  Suspicious:     23 (31.1%)
+❌ Not Found:      17 (23.0%)
+ℹ️  Likely Valid:    5 (6.8%)
 
 FLAGGED REFERENCES:
-[3] ❌ NOT_FOUND - Doe, J. et al. (2025)
+[3] 🚨 DEFINITE_FAKE - Doe, J. et al. (2025)
     → Future publication date - impossible
+    → Verify manually: https://scholar.google.com/scholar?q=...
 [7] ❌ NOT_FOUND - Sample, A.B. et al. (2022)
     → DOI does not resolve: 10.0000/fake.example.001
+
+LIKELY VALID (but not in databases):
+[15] ℹ️ "Expert Systems with Applications paper..."
+    → Not in PubMed but found in CrossRef - non-medical journal
+
+LIMITATIONS
+────────────────────────────────────────
+• PubMed primarily indexes biomedical literature
+• Non-medical journals may show false 'Not Found' results
+• 🚨 DEFINITE_FAKE = high confidence fake (future dates, DOI→wrong field)
+• ℹ️ LIKELY_VALID = probably real but outside our database coverage
+• Always verify flagged references manually before drawing conclusions
 ```
+
+### Confidence Tiers
+
+| Status | Meaning | Action |
+|--------|---------|--------|
+| 🚨 **DEFINITE_FAKE** | 100% certain fake (future dates, DOI points to wrong field) | Remove citation |
+| ❌ **NOT_FOUND** | Not in any database, no good match | Verify manually |
+| ⚠️ **SUSPICIOUS** | Partial match, some discrepancies | Review carefully |
+| ℹ️ **LIKELY_VALID** | Not in PubMed but appears legitimate (non-medical journal) | Probably OK |
+| ✅ **VERIFIED** | Found in databases, good match | Confirmed real |
 
 ### What Gets Checked
 
 | Check | How It Works |
 |-------|--------------|
 | **PubMed Lookup** | Searches 35M+ articles for author/title matches |
-| **DOI Resolution** | Verifies DOI actually resolves to a real paper |
+| **DOI Resolution** | Verifies DOI actually resolves (with retry logic) |
 | **CrossRef Validation** | Cross-references against CrossRef database |
 | **Year Verification** | Flags future dates or year mismatches |
-| **APA Style** | Optional check for proper APA 7th Edition formatting |
+| **Field Detection** | Identifies non-medical journals to reduce false positives |
+| **APA Style** | Checks APA 7th Edition formatting |
 
 ### Quick Verification
 
 Check a single DOI or PMID instantly:
 
 ```
-You: /pubmed:verify 10.1038/nature12373
+You: /pubmed:verify https://doi.org/10.1038/nature12373
 
 Gemini: ✅ VERIFIED (100% confidence)
   Title: "Nanometre-scale thermometry in a living cell"
   Found in: PubMed, CrossRef
   DOI resolves: Yes
 ```
+
+### APA 7th Edition Style Check
+
+The tool also validates reference formatting against APA 7th Edition rules:
+
+| Rule | What Gets Checked |
+|------|-------------------|
+| **Author format** | Last, F. M. (inverted, with initials) |
+| **Year format** | (2023). (in parentheses, followed by period) |
+| **Title case** | Sentence case for articles (not Title Case) |
+| **DOI format** | https://doi.org/10.xxxx (not doi: or dx.doi.org) |
+| **Ampersand** | Use & not "and" between authors |
+| **No et al.** | List all authors in reference list |
 
 ### Supported Formats
 
@@ -199,7 +238,7 @@ Gemini: ✅ VERIFIED (100% confidence)
 | PDF | `.pdf` | Extracts references section automatically |
 | Word | `.docx` | Parses document text |
 | Text | `.txt` | Raw reference list |
-| Direct | DOI/PMID | Quick single-reference check |
+| Direct | DOI/PMID/URL | Quick single-reference check |
 
 ### Real-World Example
 
@@ -208,6 +247,7 @@ We tested this on a retracted paper that was flagged for AI-generated content:
 - **Result:** 67.6% of references were problematic
 - **Multiple references** could not be found in any database
 - **Several references** cited impossible future publication dates
+- **DOI mismatches** - some DOIs pointed to papers in completely different fields
 
 The tool successfully identified fabricated citations that human reviewers missed.
 
@@ -310,10 +350,13 @@ Direct links to read the full paper:
 
 ### Reference Verification
 - **Fake Citation Detection** - Verify references against PubMed/CrossRef
-- **DOI Validation** - Check if DOIs actually resolve
+- **Tiered Confidence** - DEFINITE_FAKE, SUSPICIOUS, NOT_FOUND, LIKELY_VALID, VERIFIED
+- **DOI Validation** - Check if DOIs resolve (with retry logic)
+- **Field Detection** - Identifies non-medical journals to reduce false positives
+- **APA 7th Edition** - Full style validation (authors, year, title, DOI format)
 - **PDF/DOCX Parsing** - Extract references from documents
 - **Batch Verification** - Check entire reference lists at once
-- **Confidence Scoring** - 0-100% likelihood reference is real
+- **Manual Verify Links** - Google Scholar, CrossRef links for each flagged reference
 - **HTML Reports** - Shareable verification reports
 
 — — —
@@ -520,6 +563,7 @@ Export those top 5 articles to RIS format
 
 | Version | Features |
 |---------|----------|
+| **2.7.1** | Tiered confidence (DEFINITE_FAKE, LIKELY_VALID), field detection, APA 7th validation, DOI retry logic, manual verification links |
 | **2.7.0** | Reference Verification Tool - detect fake/AI-hallucinated citations in PDFs |
 | **2.6.0** | Official Gemini CLI install support, GitHub Releases distribution |
 | **2.5.0** | Key Findings Extraction (effect sizes, p-values, CIs), Contradiction Explainer |
