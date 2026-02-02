@@ -3948,6 +3948,17 @@ class MCPServer:
         import re
         
         identifier = identifier.strip()
+        
+        # Extract DOI from URL if provided (e.g., https://doi.org/10.1016/...)
+        doi_url_match = re.match(r'^https?://(?:dx\.)?doi\.org/(10\.\d{4,}/[^\s]+)', identifier)
+        if doi_url_match:
+            identifier = doi_url_match.group(1)
+        
+        # Extract PMID from PubMed URL if provided
+        pubmed_url_match = re.match(r'^https?://(?:www\.)?(?:pubmed\.ncbi\.nlm\.nih\.gov|ncbi\.nlm\.nih\.gov/pubmed)/(\d+)', identifier)
+        if pubmed_url_match:
+            identifier = pubmed_url_match.group(1)
+        
         is_doi = identifier.startswith('10.')
         is_pmid = identifier.isdigit()
         

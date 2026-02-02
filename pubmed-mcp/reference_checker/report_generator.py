@@ -19,13 +19,22 @@ class ReferenceReport:
     """Report for a single reference."""
     reference_number: int
     raw_citation: str
-    verification_status: str  # VERIFIED, SUSPICIOUS, NOT_FOUND, etc.
+    verification_status: str  # VERIFIED, SUSPICIOUS, NOT_FOUND, DEFINITE_FAKE, LIKELY_VALID, etc.
     confidence: float
     
     # Verification details
     pubmed_pmid: Optional[str] = None
     doi_valid: Optional[bool] = None
     discrepancies: List[str] = field(default_factory=list)
+    
+    # NEW: Fake indicators (for DEFINITE_FAKE status)
+    fake_indicators: List[str] = field(default_factory=list)
+    
+    # NEW: False positive warnings (why this might NOT be fake)
+    false_positive_warnings: List[str] = field(default_factory=list)
+    
+    # NEW: Manual verification links
+    manual_verify_links: Dict[str, str] = field(default_factory=dict)
     
     # APA issues
     apa_errors: int = 0
@@ -41,6 +50,8 @@ class BatchSummary:
     verified_count: int
     suspicious_count: int
     not_found_count: int
+    definite_fake_count: int = 0
+    likely_valid_count: int = 0
     documents: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -54,6 +65,10 @@ class VerificationReport:
     suspicious_count: int
     not_found_count: int
     error_count: int
+    
+    # NEW: Additional status counts
+    definite_fake_count: int = 0
+    likely_valid_count: int = 0
     
     # Detailed results
     references: List[ReferenceReport] = field(default_factory=list)
@@ -80,6 +95,8 @@ class ReportGenerator:
         "VERIFIED": ("✅", "\033[92m"),      # Green
         "SUSPICIOUS": ("⚠️", "\033[93m"),    # Yellow
         "NOT_FOUND": ("❌", "\033[91m"),     # Red
+        "DEFINITE_FAKE": ("🚨", "\033[91m"), # Red (strong)
+        "LIKELY_VALID": ("ℹ️", "\033[94m"),   # Blue
         "UNPARSEABLE": ("❓", "\033[90m"),   # Gray
         "ERROR": ("💥", "\033[91m"),         # Red
     }
@@ -110,6 +127,7 @@ class ReportGenerator:
         
         # Count by status
         verified = suspicious = not_found = errors = 0
+        definite_fake = likely_valid = 0
         reference_reports = []
         apa_errors_total = 0
         apa_warnings_total = 0
@@ -124,6 +142,10 @@ class ReportGenerator:
                 suspicious += 1
             elif status == "NOT_FOUND":
                 not_found += 1
+            elif status == "DEFINITE_FAKE":
+                definite_fake += 1
+            elif status == "LIKELY_VALID":
+                likely_valid += 1
             else:
                 errors += 1
             
@@ -160,9 +182,12 @@ class ReportGenerator:
                 raw_citation=raw_citation[:200] + "..." if len(raw_citation) > 200 else raw_citation,
                 verification_status=status,
                 confidence=result.confidence,
-                pubmed_pmid=result.pmid if hasattr(result, 'pmid') else None,
+                pubmed_pmid=result.pubmed_match.pmid if hasattr(result, 'pubmed_match') and result.pubmed_match else None,
                 doi_valid=result.doi_valid if hasattr(result, 'doi_valid') else None,
                 discrepancies=result.discrepancies if hasattr(result, 'discrepancies') else [],
+                fake_indicators=result.fake_indicators if hasattr(result, 'fake_indicators') else [],
+                false_positive_warnings=result.false_positive_warnings if hasattr(result, 'false_positive_warnings') else [],
+                manual_verify_links=result.manual_verify_links if hasattr(result, 'manual_verify_links') else {},
                 apa_errors=apa_err,
                 apa_warnings=apa_warn,
                 apa_issues=apa_issues
@@ -177,6 +202,8 @@ class ReportGenerator:
             suspicious_count=suspicious,
             not_found_count=not_found,
             error_count=errors,
+            definite_fake_count=definite_fake,
+            likely_valid_count=likely_valid,
             references=reference_reports,
             apa_errors_total=apa_errors_total,
             apa_warnings_total=apa_warnings_total,
@@ -231,10 +258,19 @@ class ReportGenerator:
         verified_pct = (report.verified_count / max(report.total_references, 1)) * 100
         suspicious_pct = (report.suspicious_count / max(report.total_references, 1)) * 100
         not_found_pct = (report.not_found_count / max(report.total_references, 1)) * 100
+        definite_fake_pct = (report.definite_fake_count / max(report.total_references, 1)) * 100
+        likely_valid_pct = (report.likely_valid_count / max(report.total_references, 1)) * 100
         
         lines.append(f"✅ Verified:     {report.verified_count:3d} ({verified_pct:.0f}%)")
+        
+        if report.definite_fake_count > 0:
+            lines.append(f"🚨 Definite Fake:{report.definite_fake_count:3d} ({definite_fake_pct:.0f}%)")
+        
         lines.append(f"⚠️  Suspicious:   {report.suspicious_count:3d} ({suspicious_pct:.0f}%)")
         lines.append(f"❌ Not Found:    {report.not_found_count:3d} ({not_found_pct:.0f}%)")
+        
+        if report.likely_valid_count > 0:
+            lines.append(f"ℹ️  Likely Valid: {report.likely_valid_count:3d} ({likely_valid_pct:.0f}%)")
         
         if report.error_count > 0:
             lines.append(f"💥 Errors:       {report.error_count:3d}")
@@ -245,7 +281,11 @@ class ReportGenerator:
         
         # Flagged references (only show problematic ones)
         flagged = [r for r in report.references 
-                   if r.verification_status in ["SUSPICIOUS", "NOT_FOUND", "ERROR"]]
+                   if r.verification_status in ["DEFINITE_FAKE", "SUSPICIOUS", "NOT_FOUND", "ERROR"]]
+        
+        # Also show LIKELY_VALID with notes
+        likely_valid = [r for r in report.references 
+                        if r.verification_status == "LIKELY_VALID"]
         
         if flagged:
             lines.append(f"{self.BOLD}FLAGGED REFERENCES{self.RESET_COLOR}")
@@ -269,6 +309,10 @@ class ReportGenerator:
                 if ref.pubmed_pmid:
                     lines.append(f"    → Partial match: PMID {ref.pubmed_pmid}")
                 
+                # Show fake indicators (most important for DEFINITE_FAKE)
+                for indicator in ref.fake_indicators[:3]:
+                    lines.append(f"    🚨 {indicator}")
+                
                 # Show discrepancies
                 for disc in ref.discrepancies[:3]:
                     lines.append(f"    → {disc}")
@@ -277,9 +321,32 @@ class ReportGenerator:
                 if ref.doi_valid is False:
                     lines.append("    → DOI does not resolve")
                 
+                # Show manual verification links
+                if ref.manual_verify_links:
+                    lines.append("    → Verify manually:")
+                    for source, url in list(ref.manual_verify_links.items())[:2]:
+                        lines.append(f"      {source}: {url}")
+                
                 lines.append("")
         else:
             lines.append(f"{self.BOLD}All references verified successfully!{self.RESET_COLOR}")
+            lines.append("")
+        
+        # Show LIKELY_VALID references with context
+        if likely_valid:
+            lines.append(f"{self.BOLD}LIKELY VALID (but not in databases){self.RESET_COLOR}")
+            lines.append("─" * 40)
+            lines.append("These references were not found in PubMed/CrossRef but are likely valid:")
+            lines.append("")
+            
+            for ref in likely_valid[:5]:  # Limit to first 5
+                citation = ref.raw_citation[:80] + "..." if len(ref.raw_citation) > 80 else ref.raw_citation
+                lines.append(f"[{ref.reference_number}] ℹ️  \"{citation}\"")
+                for warning in ref.false_positive_warnings[:1]:
+                    lines.append(f"    → {warning}")
+            
+            if len(likely_valid) > 5:
+                lines.append(f"    ... and {len(likely_valid) - 5} more")
             lines.append("")
         
         # APA Issues summary
@@ -319,6 +386,16 @@ class ReportGenerator:
             for warning in report.parsing_warnings[:5]:
                 lines.append(f"  ⚠️ {warning}")
             lines.append("")
+        
+        # Disclaimer
+        lines.append(f"{self.BOLD}LIMITATIONS{self.RESET_COLOR}")
+        lines.append("─" * 40)
+        lines.append("• PubMed primarily indexes biomedical literature")
+        lines.append("• Non-medical journals may show false 'Not Found' results")
+        lines.append("• 🚨 DEFINITE_FAKE = high confidence fake (future dates, DOI→wrong field)")
+        lines.append("• ℹ️  LIKELY_VALID = probably real but outside our database coverage")
+        lines.append("• Always verify flagged references manually before drawing conclusions")
+        lines.append("")
         
         # Footer
         lines.append("═" * 60)

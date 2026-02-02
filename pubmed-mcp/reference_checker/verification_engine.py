@@ -20,9 +20,19 @@ class VerificationStatus(str, Enum):
     """Status of reference verification."""
     VERIFIED = "VERIFIED"           # High confidence match found
     SUSPICIOUS = "SUSPICIOUS"       # Partial match, some discrepancies
-    NOT_FOUND = "NOT_FOUND"         # No match found - likely fake
+    NOT_FOUND = "NOT_FOUND"         # No match found in databases
+    DEFINITE_FAKE = "DEFINITE_FAKE" # 100% certain fake (DOI points to wrong paper, impossible dates)
+    LIKELY_VALID = "LIKELY_VALID"   # Probably valid but not in our databases (grey literature, non-medical)
     UNPARSEABLE = "UNPARSEABLE"     # Could not parse reference
     ERROR = "ERROR"                 # Verification error occurred
+
+
+class FakeIndicator(str, Enum):
+    """Indicators of definitely fake references."""
+    DOI_FIELD_MISMATCH = "DOI_FIELD_MISMATCH"     # DOI points to completely different field
+    FUTURE_DATE = "FUTURE_DATE"                   # Publication date is in the future
+    TRUNCATED_DOI = "TRUNCATED_DOI"               # DOI is malformed/truncated
+    DOI_DIFFERENT_PAPER = "DOI_DIFFERENT_PAPER"   # DOI resolves to different paper entirely
 
 
 @dataclass
@@ -62,6 +72,15 @@ class VerificationResult:
     # Discrepancies found
     discrepancies: List[str] = field(default_factory=list)
     
+    # NEW: Fake indicators (for DEFINITE_FAKE status)
+    fake_indicators: List[str] = field(default_factory=list)
+    
+    # NEW: False positive warnings (why this might NOT be fake)
+    false_positive_warnings: List[str] = field(default_factory=list)
+    
+    # NEW: Manual verification links
+    manual_verify_links: Dict[str, str] = field(default_factory=dict)
+    
     # Additional info
     verification_sources: List[str] = field(default_factory=list)
     error_message: Optional[str] = None
@@ -70,6 +89,40 @@ class VerificationResult:
 # Confidence thresholds
 THRESHOLD_VERIFIED = 0.80
 THRESHOLD_SUSPICIOUS = 0.50
+
+# Medical/biomedical journal keywords (for field detection)
+MEDICAL_JOURNAL_KEYWORDS = {
+    'medicine', 'medical', 'clinical', 'health', 'disease', 'therapy', 'therapeutic',
+    'pharmaceutical', 'drug', 'cancer', 'cardiology', 'neurology', 'surgery', 'nursing',
+    'psychiatry', 'psychology', 'pediatric', 'lancet', 'bmj', 'jama', 'nejm', 'annals',
+    'archives', 'journal of biological', 'biochem', 'molecular', 'cell', 'genetics',
+    'immunology', 'infection', 'virus', 'pathology', 'pharmacology', 'toxicology',
+    'epidemiology', 'public health', 'nutrition', 'obesity', 'diabetes', 'heart',
+    'lung', 'kidney', 'liver', 'brain', 'blood', 'bone', 'skin', 'eye', 'ear',
+    'dental', 'oral', 'rehabilitation', 'physical therapy', 'occupational therapy',
+    'radiology', 'imaging', 'ultrasound', 'mri', 'oncology', 'hospice', 'palliative'
+}
+
+# Non-medical journal indicators (likely false positive if not found in PubMed)
+NON_MEDICAL_INDICATORS = {
+    'computer', 'computing', 'software', 'information system', 'artificial intelligence',
+    'machine learning', 'data science', 'engineering', 'physics', 'chemistry', 'materials',
+    'education', 'educational', 'learning', 'teaching', 'pedagogy', 'curriculum',
+    'business', 'management', 'economics', 'finance', 'marketing', 'organization',
+    'social', 'sociology', 'anthropology', 'political', 'law', 'legal', 'humanities',
+    'philosophy', 'ethics', 'literature', 'linguistics', 'history', 'art', 'music',
+    'environment', 'ecology', 'sustainability', 'energy', 'renewable', 'climate',
+    'expert systems', 'decision support', 'automation', 'robotics', 'ieee', 'acm'
+}
+
+# Truncated DOI patterns that indicate parsing errors
+TRUNCATED_DOI_PATTERNS = [
+    r'^10\.\d{4}/[a-z]$',           # e.g., "10.1016/j" 
+    r'^10\.\d{4}/[a-z]{1,2}$',      # e.g., "10.1016/jo"
+    r'^10\.\d{4}$',                 # e.g., "10.1016"
+    r'^10\.\d{4}/[a-z]\.$',         # e.g., "10.1016/j."
+    r'^10\.\d{4,}/978-$',           # Truncated book DOI
+]
 
 
 class VerificationEngine:
@@ -130,15 +183,19 @@ class VerificationEngine:
     
     async def verify(self, ref: 'ParsedReference') -> VerificationResult:
         """
-        Verify a single reference.
+        Verify a single reference with tiered confidence system.
         
         Verification cascade:
-        1. If DOI present -> check DOI resolution first
-        2. Search PubMed by title + author + year
-        3. If no PubMed match -> try CrossRef API
-        4. Calculate overall confidence
+        1. Check for DEFINITE_FAKE indicators (100% certain fakes)
+        2. If DOI present -> check DOI resolution (with retry)
+        3. Search PubMed by title + author + year
+        4. If no PubMed match -> try CrossRef API
+        5. Check for LIKELY_VALID indicators (probable false positives)
+        6. Calculate overall confidence and status
         """
         from .reference_extractor import ParsedReference
+        from datetime import datetime
+        import urllib.parse
         
         # Check cache
         cache_key = self._get_cache_key(ref)
@@ -147,45 +204,138 @@ class VerificationEngine:
         
         sources_checked = []
         discrepancies = []
+        fake_indicators = []
+        false_positive_warnings = []
+        manual_verify_links = {}
         best_confidence = 0.0
         pubmed_match = None
         crossref_match = None
         doi_valid = None
         
         try:
-            # 1. Check DOI if present
+            current_year = datetime.now().year
+            
+            # === STEP 0: Check for DEFINITE_FAKE indicators ===
+            
+            # Check for truncated/malformed DOI (parsing error indicator)
             if ref.doi:
-                doi_valid = await self._check_doi(ref.doi)
+                for pattern in TRUNCATED_DOI_PATTERNS:
+                    if re.match(pattern, ref.doi, re.IGNORECASE):
+                        fake_indicators.append(f"Truncated/malformed DOI: {ref.doi} (likely PDF parsing error)")
+                        break
+            
+            # Check for future publication dates (impossible)
+            if ref.year and ref.year > current_year:
+                fake_indicators.append(f"Future publication date: {ref.year} (currently {current_year})")
+            
+            # === STEP 1: Check DOI if present (with retry) ===
+            if ref.doi and not any("Truncated" in fi for fi in fake_indicators):
+                doi_valid = await self._check_doi_with_retry(ref.doi)
                 sources_checked.append("DOI.org")
                 if doi_valid:
                     best_confidence = max(best_confidence, 0.9)
                 else:
                     discrepancies.append(f"DOI does not resolve: {ref.doi}")
             
-            # 2. Search PubMed
+            # === STEP 2: Search PubMed ===
             pubmed_match = await self._check_pubmed(ref)
             sources_checked.append("PubMed")
             
             if pubmed_match:
                 best_confidence = max(best_confidence, pubmed_match.confidence)
                 # Check for discrepancies
-                discrepancies.extend(self._find_discrepancies(ref, pubmed_match))
+                ref_discrepancies = self._find_discrepancies(ref, pubmed_match)
+                discrepancies.extend(ref_discrepancies)
+                
+                # Check for DOI pointing to completely different paper (DEFINITE_FAKE)
+                if ref.doi and pubmed_match.doi:
+                    if ref.doi.lower() != pubmed_match.doi.lower():
+                        # Check if fields are completely different
+                        if self._is_field_mismatch(ref, pubmed_match):
+                            fake_indicators.append(
+                                f"DOI mismatch with field difference: cited DOI for '{ref.journal or 'unknown'}' "
+                                f"but PubMed match is from '{pubmed_match.journal}'"
+                            )
             
-            # 3. If no good PubMed match, try CrossRef
+            # === STEP 3: If no good PubMed match, try CrossRef ===
             if best_confidence < THRESHOLD_VERIFIED:
                 crossref_match = await self._check_crossref(ref)
                 sources_checked.append("CrossRef")
                 
                 if crossref_match:
                     best_confidence = max(best_confidence, crossref_match.confidence)
+                    
+                    # If CrossRef found it but PubMed didn't, check if non-medical field
+                    if crossref_match.confidence >= THRESHOLD_VERIFIED and not pubmed_match:
+                        if self._is_non_medical_journal(ref.journal or crossref_match.journal or ""):
+                            false_positive_warnings.append(
+                                f"Not in PubMed but found in CrossRef - this appears to be a non-medical "
+                                f"journal ('{crossref_match.journal}') which PubMed may not index"
+                            )
             
-            # Determine status
-            if best_confidence >= THRESHOLD_VERIFIED:
+            # === STEP 4: Check for LIKELY_VALID indicators ===
+            
+            # Classic works (pre-1980) often show wrong years due to reprints
+            if ref.year and ref.year < 1980:
+                if pubmed_match and pubmed_match.year and pubmed_match.year > 2000:
+                    false_positive_warnings.append(
+                        f"Classic work from {ref.year} - database shows {pubmed_match.year} "
+                        f"(likely a modern reprint/ebook edition, not necessarily fake)"
+                    )
+            
+            # Web resources / grey literature
+            if ref.raw_text and any(indicator in ref.raw_text.lower() for indicator in 
+                ['retrieved from', 'accessed', 'http://', 'https://', '.gov', '.org/report']):
+                if best_confidence < THRESHOLD_SUSPICIOUS:
+                    false_positive_warnings.append(
+                        "This appears to be a web resource or grey literature - "
+                        "these are not indexed in academic databases but may still be valid"
+                    )
+            
+            # Non-medical journal not in PubMed
+            if not pubmed_match and ref.journal:
+                if self._is_non_medical_journal(ref.journal):
+                    false_positive_warnings.append(
+                        f"Journal '{ref.journal}' appears to be outside PubMed's biomedical scope - "
+                        f"not finding it in PubMed is expected, not an indicator of fakeness"
+                    )
+            
+            # === STEP 5: Generate manual verification links ===
+            if ref.title:
+                encoded_title = urllib.parse.quote(ref.title[:100])
+                manual_verify_links["google_scholar"] = f"https://scholar.google.com/scholar?q={encoded_title}"
+                manual_verify_links["crossref"] = f"https://search.crossref.org/?q={encoded_title}"
+            if ref.doi:
+                manual_verify_links["doi_resolver"] = f"https://doi.org/{ref.doi}"
+            
+            # === STEP 6: Determine final status ===
+            
+            # DEFINITE_FAKE: Strong indicators of fabrication
+            if fake_indicators and not false_positive_warnings:
+                # Future date + not found = definitely fake
+                if any("Future publication" in fi for fi in fake_indicators) and best_confidence < THRESHOLD_SUSPICIOUS:
+                    status = VerificationStatus.DEFINITE_FAKE
+                # DOI points to completely different field = definitely fake  
+                elif any("field difference" in fi for fi in fake_indicators):
+                    status = VerificationStatus.DEFINITE_FAKE
+                else:
+                    status = VerificationStatus.SUSPICIOUS
+            
+            # LIKELY_VALID: Has false positive warnings and some match
+            elif false_positive_warnings and best_confidence >= 0.3:
+                status = VerificationStatus.LIKELY_VALID
+            
+            # Standard confidence-based status
+            elif best_confidence >= THRESHOLD_VERIFIED:
                 status = VerificationStatus.VERIFIED
             elif best_confidence >= THRESHOLD_SUSPICIOUS:
                 status = VerificationStatus.SUSPICIOUS
             else:
-                status = VerificationStatus.NOT_FOUND
+                # NOT_FOUND but check if we should warn about false positives
+                if false_positive_warnings:
+                    status = VerificationStatus.LIKELY_VALID
+                else:
+                    status = VerificationStatus.NOT_FOUND
             
             result = VerificationResult(
                 status=status,
@@ -194,6 +344,9 @@ class VerificationEngine:
                 crossref_match=crossref_match,
                 doi_valid=doi_valid,
                 discrepancies=discrepancies,
+                fake_indicators=fake_indicators,
+                false_positive_warnings=false_positive_warnings,
+                manual_verify_links=manual_verify_links,
                 verification_sources=sources_checked
             )
             
@@ -208,6 +361,61 @@ class VerificationEngine:
         # Cache result
         self._cache[cache_key] = result
         return result
+    
+    def _is_non_medical_journal(self, journal: str) -> bool:
+        """Check if journal is likely non-medical (would cause false PubMed negatives)."""
+        journal_lower = journal.lower()
+        
+        # Check for medical indicators first
+        for keyword in MEDICAL_JOURNAL_KEYWORDS:
+            if keyword in journal_lower:
+                return False
+        
+        # Check for non-medical indicators
+        for keyword in NON_MEDICAL_INDICATORS:
+            if keyword in journal_lower:
+                return True
+        
+        return False
+    
+    def _is_field_mismatch(self, ref: 'ParsedReference', match: PubMedMatch) -> bool:
+        """Check if reference and match are from completely different fields."""
+        ref_journal = (ref.journal or "").lower()
+        match_journal = (match.journal or "").lower()
+        
+        # If one is medical and other is not, it's a mismatch
+        ref_is_medical = any(kw in ref_journal for kw in MEDICAL_JOURNAL_KEYWORDS)
+        match_is_medical = any(kw in match_journal for kw in MEDICAL_JOURNAL_KEYWORDS)
+        
+        ref_is_non_medical = any(kw in ref_journal for kw in NON_MEDICAL_INDICATORS)
+        match_is_non_medical = any(kw in match_journal for kw in NON_MEDICAL_INDICATORS)
+        
+        # Clear mismatch: one is medical, other is non-medical
+        if (ref_is_non_medical and match_is_medical) or (ref_is_medical and match_is_non_medical):
+            return True
+        
+        return False
+    
+    async def _check_doi_with_retry(self, doi: str, max_retries: int = 3) -> bool:
+        """Check if DOI resolves with retry logic for network issues."""
+        import asyncio
+        
+        for attempt in range(max_retries):
+            try:
+                client = await self._get_http_client()
+                url = f"{self.DOI_RESOLVER}/{doi}"
+                response = await client.head(url, follow_redirects=True, timeout=10.0)
+                if response.status_code == 200:
+                    return True
+                elif response.status_code == 404:
+                    return False  # Definitely doesn't exist
+            except Exception:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
+                    continue
+        
+        # After retries, assume network issue - don't mark as fake
+        return None  # Indeterminate
     
     async def verify_batch(self, refs: List['ParsedReference'], 
                           max_concurrent: int = 5) -> List[VerificationResult]:
