@@ -7,6 +7,8 @@ Supports:
 - Plain text (.txt) files
 
 This module extracts the references section and splits into individual entries.
+
+v2.8.1: Added table content filtering to reduce false reference extractions.
 """
 
 import re
@@ -56,6 +58,37 @@ class DocumentParser:
         r"(?:^|\n)\s*ethics\s+statement",
     ]
     
+    # Patterns that indicate table content (not references)
+    TABLE_INDICATORS = [
+        r"^\s*[\d.,]+\s*$",  # Just numbers (e.g., "3.5", "100")
+        r"^\s*[\d.,]+\s*%\s*$",  # Percentages (e.g., "85.3%")
+        r"^\s*[<>≤≥=±]\s*[\d.,]+",  # Statistical values (e.g., "<0.001", "±2.5")
+        r"^\s*p\s*[<>=]\s*[\d.,]+",  # P-values (e.g., "p<0.05")
+        r"^\s*\d+\s*/\s*\d+\s*$",  # Fractions (e.g., "3/10")
+        r"^\s*\d+\s*-\s*\d+\s*$",  # Ranges without context (e.g., "10-15")
+        r"^\s*n\s*=\s*\d+",  # Sample sizes (e.g., "n=50")
+        r"^\s*CI\s*:?\s*[\d.,-]+",  # Confidence intervals
+        r"^\s*OR\s*:?\s*[\d.,]+",  # Odds ratios
+        r"^\s*HR\s*:?\s*[\d.,]+",  # Hazard ratios
+        r"^\s*RR\s*:?\s*[\d.,]+",  # Risk ratios
+        r"^\s*MD\s*:?\s*[\d.,-]+",  # Mean differences
+        r"^\s*SMD\s*:?\s*[\d.,-]+",  # Standardized mean differences
+        r"^\s*NNT\s*:?\s*[\d.,]+",  # Number needed to treat
+        r"^\s*\(\s*[\d.,-]+\s*,\s*[\d.,-]+\s*\)\s*$",  # CI ranges like "(1.2, 3.4)"
+        r"^\s*\[\s*[\d.,-]+\s*,\s*[\d.,-]+\s*\]\s*$",  # CI ranges like "[1.2, 3.4]"
+        r"^\s*Yes\s*$",  # Binary values
+        r"^\s*No\s*$",
+        r"^\s*N/A\s*$",
+        r"^\s*NA\s*$",
+        r"^\s*NR\s*$",  # Not reported
+        r"^\s*[-–—]+\s*$",  # Just dashes
+        r"^\s*[✓✗×•·]+\s*$",  # Checkmarks and bullets
+    ]
+    
+    # Minimum characteristics for a valid reference
+    MIN_REFERENCE_LENGTH = 40  # Characters
+    MIN_WORD_COUNT = 6  # Words
+    
     def __init__(self):
         self._fitz_available = None
         self._docx_available = None
@@ -85,6 +118,105 @@ class DocumentParser:
             return True, ""
         
         return True, ""
+    
+    def _is_table_content(self, text: str) -> bool:
+        """
+        Detect if text looks like table data rather than a reference.
+        
+        Returns True if the text appears to be table content.
+        """
+        text = text.strip()
+        
+        # Empty or very short text is likely table content
+        if len(text) < 10:
+            return True
+        
+        # Check against table indicator patterns
+        for pattern in self.TABLE_INDICATORS:
+            if re.match(pattern, text, re.IGNORECASE):
+                return True
+        
+        # High proportion of numbers suggests table content
+        digit_count = sum(1 for c in text if c.isdigit())
+        if len(text) > 0 and digit_count / len(text) > 0.5:
+            return True
+        
+        # Very few alphabetic characters
+        alpha_count = sum(1 for c in text if c.isalpha())
+        if len(text) > 5 and alpha_count / len(text) < 0.3:
+            return True
+        
+        return False
+    
+    def _is_valid_reference(self, text: str) -> bool:
+        """
+        Validate that text looks like a legitimate reference.
+        
+        Checks:
+        - Minimum length
+        - Contains author-like patterns
+        - Contains year
+        - Not just table data
+        """
+        text = text.strip()
+        
+        # Check minimum length
+        if len(text) < self.MIN_REFERENCE_LENGTH:
+            return False
+        
+        # Check minimum word count
+        words = text.split()
+        if len(words) < self.MIN_WORD_COUNT:
+            return False
+        
+        # Filter out table content
+        if self._is_table_content(text):
+            return False
+        
+        # Must contain a year (1900-2099)
+        if not re.search(r'\b(19|20)\d{2}\b', text):
+            return False
+        
+        # Should contain author-like pattern: "Name," or "Name, I." or "et al"
+        author_patterns = [
+            r'[A-Z][a-z]+,\s*[A-Z]\.?',  # Smith, J.
+            r'[A-Z][a-z]+\s+[A-Z]\.',     # Smith J.
+            r'et\s+al\.?',                 # et al.
+            r'[A-Z][a-z]+,\s+[A-Z][a-z]+', # Last, First
+        ]
+        has_author = any(re.search(p, text) for p in author_patterns)
+        if not has_author:
+            return False
+        
+        # Should NOT be primarily a table header or column name
+        table_header_patterns = [
+            r'^(Study|Author|Year|Design|N|Sample|Outcome|Result|Intervention|Control|Mean|SD)\s*$',
+            r'^Table\s+\d+',
+            r'^Figure\s+\d+',
+        ]
+        for pattern in table_header_patterns:
+            if re.match(pattern, text, re.IGNORECASE):
+                return False
+        
+        return True
+    
+    def _filter_table_entries(self, entries: List[str]) -> Tuple[List[str], List[str]]:
+        """
+        Filter out entries that look like table content.
+        
+        Returns:
+            Tuple of (valid_entries, filtered_entries)
+        """
+        valid = []
+        filtered = []
+        
+        for entry in entries:
+            if self._is_valid_reference(entry):
+                valid.append(entry)
+            else:
+                filtered.append(entry)
+        
+        return valid, filtered
     
     def parse(self, file_path: str) -> DocumentContent:
         """
@@ -129,7 +261,17 @@ class DocumentParser:
         references_section, warnings = self._find_references_section(full_text)
         
         # Split into individual entries
-        reference_entries = self._split_references(references_section)
+        raw_entries = self._split_references(references_section)
+        
+        # Filter out table content (v2.8.1)
+        reference_entries, filtered_entries = self._filter_table_entries(raw_entries)
+        
+        # Add warning if we filtered entries
+        if filtered_entries:
+            warnings.append(
+                f"Filtered {len(filtered_entries)} non-reference entries "
+                f"(likely table content). Kept {len(reference_entries)} valid references."
+            )
         
         return DocumentContent(
             file_path=str(path.absolute()),

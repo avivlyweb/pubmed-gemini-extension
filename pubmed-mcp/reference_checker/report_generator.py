@@ -512,20 +512,23 @@ class ReportGenerator:
         lines.append("")
     
     def _render_json(self, report: VerificationReport) -> str:
-        """Render as JSON."""
+        """Render as JSON with full advice fields (v2.8.1)."""
         # Convert dataclasses to dicts
+        total = max(report.total_references, 1)
         data = {
             "document_name": report.document_name,
             "timestamp": report.timestamp,
+            "version": "2.8.1",
             "summary": {
                 "total_references": report.total_references,
                 "verified": report.verified_count,
                 "suspicious": report.suspicious_count,
                 "not_found": report.not_found_count,
+                "definite_fake": report.definite_fake_count,
+                "likely_valid": report.likely_valid_count,
                 "errors": report.error_count,
-                "verified_percentage": round(
-                    (report.verified_count / max(report.total_references, 1)) * 100, 1
-                )
+                "verified_percentage": round((report.verified_count / total) * 100, 1),
+                "action_required": report.definite_fake_count + report.suspicious_count + report.not_found_count
             },
             "apa_summary": {
                 "errors": report.apa_errors_total,
@@ -541,6 +544,11 @@ class ReportGenerator:
                     "pubmed_pmid": ref.pubmed_pmid,
                     "doi_valid": ref.doi_valid,
                     "discrepancies": ref.discrepancies,
+                    "fake_indicators": ref.fake_indicators,
+                    "false_positive_warnings": ref.false_positive_warnings,
+                    "advice": ref.advice,
+                    "fix_suggestion": ref.fix_suggestion,
+                    "manual_verify_links": ref.manual_verify_links,
                     "apa_issues": ref.apa_issues
                 }
                 for ref in report.references

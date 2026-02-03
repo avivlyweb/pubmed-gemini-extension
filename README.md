@@ -6,7 +6,7 @@ Nagomi (和み): calm, balanced clarity in evidence.
 
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
-[![Version](https://img.shields.io/badge/version-2.7.1-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
+[![Version](https://img.shields.io/badge/version-2.8.1-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
 
@@ -141,6 +141,63 @@ That's it! Gemini will search PubMed and give you an evidence-based answer.
 | "Verify references in my PDF" | Detection of fake/hallucinated citations |
 
 **One command. PhD-level analysis. Seconds.**
+
+— — —
+
+## New in v2.8 - Enhanced Verification & Actionable Reports
+
+### Multi-Source DOI Verification
+
+DOIs that fail initial checks are now verified against multiple sources:
+
+| Source | Purpose |
+|--------|---------|
+| **doi.org** | Primary DOI resolution check |
+| **CrossRef API** | Direct metadata lookup |
+| **OpenAlex** | Free, comprehensive academic database |
+| **Europe PMC** | European papers and preprints |
+
+### Frankenstein Detection
+
+Catches "Frankenstein references" - fake citations that combine real DOIs with fabricated metadata:
+
+```
+🚨 [13] DEFINITE_FAKE
+  "Hao, J. et al. (2025). Biomechanical analysis of PAP..."
+  
+  📍 Problem:
+     • DOI mismatch: Claims "Annals of Biomedical Engineering" 
+       but DOI points to "Quality & Safety in Health Care"
+     • Title similarity: 12% (threshold: 60%)
+  
+  ✏️  What to do:
+     REMOVE or REPLACE this reference immediately.
+     → Search Google Scholar for the correct citation.
+```
+
+### Title Similarity Threshold
+
+- Uses `rapidfuzz` for fast, accurate title matching
+- References must have ≥60% title similarity to claimed DOI metadata
+- Below threshold → flagged as potential Frankenstein
+
+### Actionable Advice
+
+Every flagged reference now includes:
+
+| Field | Purpose |
+|-------|---------|
+| **Problem** | What's wrong with this reference |
+| **What to do** | Specific action to take |
+| **Verify here** | Direct links to Google Scholar, CrossRef |
+
+### PDF Table Filtering (v2.8.1)
+
+Improved PDF parsing to filter out table content that was incorrectly extracted as references:
+
+- Detects statistical values (p-values, CIs, ORs)
+- Filters percentage and fraction patterns
+- Validates minimum reference characteristics (length, author pattern, year)
 
 — — —
 
@@ -563,6 +620,8 @@ Export those top 5 articles to RIS format
 
 | Version | Features |
 |---------|----------|
+| **2.8.1** | PDF table filtering, actionable advice in reports, improved terminal/HTML output |
+| **2.8.0** | Multi-source DOI verification (CrossRef, OpenAlex, Europe PMC), Frankenstein detection, 60% title similarity threshold, rapidfuzz integration |
 | **2.7.1** | Tiered confidence (DEFINITE_FAKE, LIKELY_VALID), field detection, APA 7th validation, DOI retry logic, manual verification links |
 | **2.7.0** | Reference Verification Tool - detect fake/AI-hallucinated citations in PDFs |
 | **2.6.0** | Official Gemini CLI install support, GitHub Releases distribution |
