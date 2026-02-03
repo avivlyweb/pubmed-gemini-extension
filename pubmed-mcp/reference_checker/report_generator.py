@@ -36,6 +36,10 @@ class ReferenceReport:
     # NEW: Manual verification links
     manual_verify_links: Dict[str, str] = field(default_factory=dict)
     
+    # NEW v2.8.1: Actionable advice
+    advice: str = ""  # What to do about this reference
+    fix_suggestion: str = ""  # Specific fix recommendation
+    
     # APA issues
     apa_errors: int = 0
     apa_warnings: int = 0
@@ -103,6 +107,99 @@ class ReportGenerator:
     
     RESET_COLOR = "\033[0m"
     BOLD = "\033[1m"
+    
+    # Advice templates for each status
+    ADVICE_TEMPLATES = {
+        "DEFINITE_FAKE": {
+            "advice": "REMOVE or REPLACE this reference immediately. It shows clear signs of fabrication.",
+            "icon": "🚨"
+        },
+        "NOT_FOUND": {
+            "advice": "Verify manually using Google Scholar. May be legitimate grey literature or a very new publication.",
+            "icon": "❌"
+        },
+        "SUSPICIOUS": {
+            "advice": "Check the DOI and metadata carefully. The reference exists but has discrepancies.",
+            "icon": "⚠️"
+        },
+        "LIKELY_VALID": {
+            "advice": "Probably valid. Not in PubMed because it's outside biomedical scope (book, non-medical journal, etc.).",
+            "icon": "ℹ️"
+        },
+        "VERIFIED": {
+            "advice": "No action needed. Reference verified in databases.",
+            "icon": "✅"
+        },
+        "ERROR": {
+            "advice": "Could not verify due to technical error. Try again or verify manually.",
+            "icon": "💥"
+        }
+    }
+    
+    def _generate_advice(self, ref_report: ReferenceReport) -> tuple:
+        """
+        Generate actionable advice for a reference based on its verification status.
+        
+        Returns:
+            (advice: str, fix_suggestion: str)
+        """
+        status = ref_report.verification_status
+        template = self.ADVICE_TEMPLATES.get(status, self.ADVICE_TEMPLATES["ERROR"])
+        
+        advice = template["advice"]
+        fix_suggestion = ""
+        
+        # Generate specific fix suggestions based on indicators
+        if status == "DEFINITE_FAKE":
+            if ref_report.fake_indicators:
+                indicator = ref_report.fake_indicators[0].lower()
+                if "doi" in indicator and "mismatch" in indicator:
+                    fix_suggestion = "The DOI points to a different paper. Search Google Scholar for the correct DOI, or remove the DOI entirely."
+                elif "future" in indicator:
+                    fix_suggestion = "This paper claims a future publication date. Check if it's a preprint or typo, otherwise remove."
+                elif "truncated" in indicator:
+                    fix_suggestion = "The DOI appears truncated (PDF parsing error). Find the complete DOI from the original source."
+                elif "frankenstein" in indicator:
+                    fix_suggestion = "This is a 'Frankenstein citation' - real DOI attached to wrong paper. Find the correct DOI."
+                else:
+                    fix_suggestion = "Search Google Scholar to find if this paper actually exists with correct metadata."
+        
+        elif status == "NOT_FOUND":
+            if ref_report.discrepancies:
+                if any("doi" in d.lower() for d in ref_report.discrepancies):
+                    fix_suggestion = "The DOI doesn't resolve. Verify it's typed correctly, or search for the paper by title."
+                else:
+                    fix_suggestion = "Paper not found in databases. Check spelling and verify the source exists."
+            else:
+                fix_suggestion = "Search Google Scholar or the journal website directly to confirm this reference exists."
+        
+        elif status == "SUSPICIOUS":
+            if ref_report.discrepancies:
+                disc = ref_report.discrepancies[0].lower()
+                if "year" in disc:
+                    fix_suggestion = "Publication year doesn't match. Check the original source for correct year."
+                elif "title" in disc:
+                    fix_suggestion = "Title doesn't match well. Verify you're citing the correct paper."
+                elif "doi" in disc:
+                    fix_suggestion = "DOI mismatch detected. Verify the DOI links to the intended paper."
+                else:
+                    fix_suggestion = "Metadata discrepancies found. Double-check all citation details."
+            else:
+                fix_suggestion = "Some metadata doesn't match. Verify citation details against the original source."
+        
+        elif status == "LIKELY_VALID":
+            if ref_report.false_positive_warnings:
+                warning = ref_report.false_positive_warnings[0].lower()
+                if "non-medical" in warning or "pubmed" in warning:
+                    fix_suggestion = "This journal isn't indexed in PubMed. No action needed unless you doubt the source."
+                elif "grey literature" in warning or "web" in warning:
+                    fix_suggestion = "Web resource detected. Ensure you have 'Retrieved from [URL]' with access date."
+                elif "classic" in warning:
+                    fix_suggestion = "Classic/older work may show as different edition. Verify the edition you're citing."
+                else:
+                    fix_suggestion = "No action needed - this appears legitimate but is outside database coverage."
+        
+        return advice, fix_suggestion
     
     def build_report(self, 
                      verification_results: List[Any],
@@ -192,6 +289,12 @@ class ReportGenerator:
                 apa_warnings=apa_warn,
                 apa_issues=apa_issues
             )
+            
+            # Generate advice for this reference
+            advice, fix_suggestion = self._generate_advice(ref_report)
+            ref_report.advice = advice
+            ref_report.fix_suggestion = fix_suggestion
+            
             reference_reports.append(ref_report)
         
         return VerificationReport(
@@ -235,14 +338,14 @@ class ReportGenerator:
             raise ValueError(f"Unsupported format: {format}")
     
     def _render_terminal(self, report: VerificationReport) -> str:
-        """Render rich terminal output with ANSI colors."""
+        """Render rich terminal output with ANSI colors and actionable advice."""
         lines = []
         
         # Header
         lines.append("")
-        lines.append(f"{self.BOLD}{'═' * 60}{self.RESET_COLOR}")
-        lines.append(f"{self.BOLD}REFERENCE VERIFICATION REPORT{self.RESET_COLOR}")
-        lines.append(f"{'═' * 60}")
+        lines.append(f"{self.BOLD}{'═' * 70}{self.RESET_COLOR}")
+        lines.append(f"{self.BOLD}📋 REFERENCE VERIFICATION REPORT{self.RESET_COLOR}")
+        lines.append(f"{'═' * 70}")
         lines.append("")
         
         # Document info
@@ -250,10 +353,11 @@ class ReportGenerator:
         lines.append(f"Checked:  {report.timestamp}")
         lines.append("")
         
-        # Summary
-        lines.append(f"{self.BOLD}SUMMARY{self.RESET_COLOR}")
-        lines.append("─" * 40)
+        # Summary with action alert
+        lines.append(f"{self.BOLD}📊 SUMMARY{self.RESET_COLOR}")
+        lines.append("─" * 50)
         lines.append(f"Total References: {report.total_references}")
+        lines.append("")
         
         verified_pct = (report.verified_count / max(report.total_references, 1)) * 100
         suspicious_pct = (report.suspicious_count / max(report.total_references, 1)) * 100
@@ -261,146 +365,151 @@ class ReportGenerator:
         definite_fake_pct = (report.definite_fake_count / max(report.total_references, 1)) * 100
         likely_valid_pct = (report.likely_valid_count / max(report.total_references, 1)) * 100
         
-        lines.append(f"✅ Verified:     {report.verified_count:3d} ({verified_pct:.0f}%)")
+        lines.append(f"✅ Verified:      {report.verified_count:3d} ({verified_pct:.0f}%)")
         
         if report.definite_fake_count > 0:
-            lines.append(f"🚨 Definite Fake:{report.definite_fake_count:3d} ({definite_fake_pct:.0f}%)")
+            lines.append(f"🚨 Definite Fake: {report.definite_fake_count:3d} ({definite_fake_pct:.0f}%) ← ACTION REQUIRED")
         
-        lines.append(f"⚠️  Suspicious:   {report.suspicious_count:3d} ({suspicious_pct:.0f}%)")
-        lines.append(f"❌ Not Found:    {report.not_found_count:3d} ({not_found_pct:.0f}%)")
+        lines.append(f"⚠️  Suspicious:    {report.suspicious_count:3d} ({suspicious_pct:.0f}%)")
+        lines.append(f"❌ Not Found:     {report.not_found_count:3d} ({not_found_pct:.0f}%)")
         
         if report.likely_valid_count > 0:
-            lines.append(f"ℹ️  Likely Valid: {report.likely_valid_count:3d} ({likely_valid_pct:.0f}%)")
+            lines.append(f"ℹ️  Likely Valid:  {report.likely_valid_count:3d} ({likely_valid_pct:.0f}%)")
         
         if report.error_count > 0:
-            lines.append(f"💥 Errors:       {report.error_count:3d}")
+            lines.append(f"💥 Errors:        {report.error_count:3d}")
         
         lines.append("")
-        lines.append(f"APA Issues:   {report.apa_errors_total} errors, {report.apa_warnings_total} warnings")
-        lines.append("")
         
-        # Flagged references (only show problematic ones)
-        flagged = [r for r in report.references 
-                   if r.verification_status in ["DEFINITE_FAKE", "SUSPICIOUS", "NOT_FOUND", "ERROR"]]
+        # Action required alert
+        problem_count = report.definite_fake_count + report.suspicious_count + report.not_found_count
+        if problem_count > 0:
+            lines.append(f"{self.BOLD}⚡ ACTION NEEDED: {problem_count} reference(s) require attention{self.RESET_COLOR}")
+            lines.append("")
         
-        # Also show LIKELY_VALID with notes
-        likely_valid = [r for r in report.references 
-                        if r.verification_status == "LIKELY_VALID"]
+        # Separate sections by severity
+        definite_fakes = [r for r in report.references if r.verification_status == "DEFINITE_FAKE"]
+        suspicious = [r for r in report.references if r.verification_status == "SUSPICIOUS"]
+        not_found = [r for r in report.references if r.verification_status == "NOT_FOUND"]
+        likely_valid = [r for r in report.references if r.verification_status == "LIKELY_VALID"]
         
-        if flagged:
-            lines.append(f"{self.BOLD}FLAGGED REFERENCES{self.RESET_COLOR}")
-            lines.append("─" * 40)
+        # DEFINITE_FAKE section (most critical)
+        if definite_fakes:
+            lines.append(f"{self.BOLD}🚨 DEFINITE FAKES - MUST FIX OR REMOVE{self.RESET_COLOR}")
+            lines.append("═" * 50)
             lines.append("")
             
-            for ref in flagged:
-                symbol, color = self.STATUS_SYMBOLS.get(
-                    ref.verification_status, ("?", self.RESET_COLOR)
-                )
-                
-                lines.append(f"[{ref.reference_number}] {symbol} {ref.verification_status} (confidence: {ref.confidence:.2f})")
-                
-                # Show truncated citation
-                citation = ref.raw_citation
-                if len(citation) > 100:
-                    citation = citation[:100] + "..."
-                lines.append(f'    "{citation}"')
-                
-                # Show PMID if found
-                if ref.pubmed_pmid:
-                    lines.append(f"    → Partial match: PMID {ref.pubmed_pmid}")
-                
-                # Show fake indicators (most important for DEFINITE_FAKE)
-                for indicator in ref.fake_indicators[:3]:
-                    lines.append(f"    🚨 {indicator}")
-                
-                # Show discrepancies
-                for disc in ref.discrepancies[:3]:
-                    lines.append(f"    → {disc}")
-                
-                # Show DOI status
-                if ref.doi_valid is False:
-                    lines.append("    → DOI does not resolve")
-                
-                # Show manual verification links
-                if ref.manual_verify_links:
-                    lines.append("    → Verify manually:")
-                    for source, url in list(ref.manual_verify_links.items())[:2]:
-                        lines.append(f"      {source}: {url}")
-                
-                lines.append("")
-        else:
-            lines.append(f"{self.BOLD}All references verified successfully!{self.RESET_COLOR}")
-            lines.append("")
+            for ref in definite_fakes:
+                self._render_reference_with_advice(lines, ref)
         
-        # Show LIKELY_VALID references with context
+        # SUSPICIOUS section
+        if suspicious:
+            lines.append(f"{self.BOLD}⚠️ SUSPICIOUS - VERIFY MANUALLY{self.RESET_COLOR}")
+            lines.append("═" * 50)
+            lines.append("")
+            
+            for ref in suspicious:
+                self._render_reference_with_advice(lines, ref)
+        
+        # NOT_FOUND section
+        if not_found:
+            lines.append(f"{self.BOLD}❌ NOT FOUND - CHECK THESE{self.RESET_COLOR}")
+            lines.append("═" * 50)
+            lines.append("")
+            
+            for ref in not_found:
+                self._render_reference_with_advice(lines, ref)
+        
+        # LIKELY_VALID section (informational)
         if likely_valid:
-            lines.append(f"{self.BOLD}LIKELY VALID (but not in databases){self.RESET_COLOR}")
-            lines.append("─" * 40)
-            lines.append("These references were not found in PubMed/CrossRef but are likely valid:")
+            lines.append(f"{self.BOLD}ℹ️ LIKELY VALID (outside database coverage){self.RESET_COLOR}")
+            lines.append("─" * 50)
+            lines.append("These weren't found in PubMed but appear legitimate:")
             lines.append("")
             
-            for ref in likely_valid[:5]:  # Limit to first 5
-                citation = ref.raw_citation[:80] + "..." if len(ref.raw_citation) > 80 else ref.raw_citation
-                lines.append(f"[{ref.reference_number}] ℹ️  \"{citation}\"")
-                for warning in ref.false_positive_warnings[:1]:
-                    lines.append(f"    → {warning}")
+            for ref in likely_valid[:5]:
+                citation = ref.raw_citation[:70] + "..." if len(ref.raw_citation) > 70 else ref.raw_citation
+                lines.append(f"[{ref.reference_number}] \"{citation}\"")
+                if ref.false_positive_warnings:
+                    lines.append(f"    → {ref.false_positive_warnings[0][:80]}")
+                lines.append("")
             
             if len(likely_valid) > 5:
                 lines.append(f"    ... and {len(likely_valid) - 5} more")
-            lines.append("")
+                lines.append("")
         
         # APA Issues summary
         if report.apa_errors_total > 0 or report.apa_warnings_total > 0:
-            lines.append(f"{self.BOLD}APA STYLE ISSUES{self.RESET_COLOR}")
-            lines.append("─" * 40)
-            
-            # Group by type
-            for issue_type, count in sorted(report.apa_issues_by_type.items()):
-                lines.append(f"  {issue_type}: {count}")
-            
-            lines.append("")
-            
-            # Show specific issues (limit to first 10)
-            issue_count = 0
-            for ref in report.references:
-                for issue in ref.apa_issues:
-                    if issue_count >= 10:
-                        remaining = sum(len(r.apa_issues) for r in report.references) - 10
-                        if remaining > 0:
-                            lines.append(f"  ... and {remaining} more issues")
-                        break
-                    
-                    severity = "⚠️" if issue.get('severity') == 'warning' else "❌"
-                    lines.append(f"[{ref.reference_number}] {severity} {issue.get('message', '')}")
-                    issue_count += 1
-                
-                if issue_count >= 10:
-                    break
-            
+            lines.append(f"{self.BOLD}📝 APA STYLE ISSUES{self.RESET_COLOR}")
+            lines.append("─" * 50)
+            lines.append(f"Errors: {report.apa_errors_total}, Warnings: {report.apa_warnings_total}")
             lines.append("")
         
-        # Parsing warnings
-        if report.parsing_warnings:
-            lines.append(f"{self.BOLD}PARSING NOTES{self.RESET_COLOR}")
-            lines.append("─" * 40)
-            for warning in report.parsing_warnings[:5]:
-                lines.append(f"  ⚠️ {warning}")
-            lines.append("")
-        
-        # Disclaimer
-        lines.append(f"{self.BOLD}LIMITATIONS{self.RESET_COLOR}")
-        lines.append("─" * 40)
-        lines.append("• PubMed primarily indexes biomedical literature")
-        lines.append("• Non-medical journals may show false 'Not Found' results")
-        lines.append("• 🚨 DEFINITE_FAKE = high confidence fake (future dates, DOI→wrong field)")
-        lines.append("• ℹ️  LIKELY_VALID = probably real but outside our database coverage")
-        lines.append("• Always verify flagged references manually before drawing conclusions")
+        # Quick reference guide
+        lines.append(f"{self.BOLD}💡 QUICK VERIFICATION GUIDE{self.RESET_COLOR}")
+        lines.append("─" * 50)
+        lines.append("• Google Scholar: https://scholar.google.com")
+        lines.append("• CrossRef Search: https://search.crossref.org")
+        lines.append("• DOI Resolver: https://doi.org/[YOUR_DOI]")
         lines.append("")
         
-        # Footer
-        lines.append("═" * 60)
+        # Footer with disclaimer
+        lines.append(f"{self.BOLD}📌 IMPORTANT NOTES{self.RESET_COLOR}")
+        lines.append("─" * 50)
+        lines.append("• 🚨 DEFINITE_FAKE = High confidence fake (DOI mismatch, future dates)")
+        lines.append("• ⚠️  SUSPICIOUS = Exists but has discrepancies")
+        lines.append("• ❌ NOT_FOUND = May be legitimate but not in databases")
+        lines.append("• ℹ️  LIKELY_VALID = Outside PubMed scope (non-medical, books)")
+        lines.append("• Always verify flagged references before submitting")
+        lines.append("")
+        lines.append("═" * 70)
+        lines.append(f"Generated by PubMed Reference Checker v2.8.1 | 和み (Nagomi)")
+        lines.append("═" * 70)
         
         return "\n".join(lines)
+    
+    def _render_reference_with_advice(self, lines: list, ref: ReferenceReport) -> None:
+        """Render a single reference with actionable advice."""
+        symbol, color = self.STATUS_SYMBOLS.get(ref.verification_status, ("?", self.RESET_COLOR))
+        
+        # Reference header
+        lines.append(f"{symbol} [{ref.reference_number}] {ref.verification_status}")
+        lines.append("─" * 40)
+        
+        # Citation (truncated)
+        citation = ref.raw_citation
+        if len(citation) > 100:
+            citation = citation[:100] + "..."
+        lines.append(f'"{citation}"')
+        lines.append("")
+        
+        # Problem description
+        lines.append(f"  📍 Problem:")
+        if ref.fake_indicators:
+            for indicator in ref.fake_indicators[:2]:
+                lines.append(f"     • {indicator}")
+        elif ref.discrepancies:
+            for disc in ref.discrepancies[:2]:
+                lines.append(f"     • {disc}")
+        elif ref.doi_valid is False:
+            lines.append("     • DOI does not resolve to any paper")
+        else:
+            lines.append("     • Reference not found in PubMed/CrossRef")
+        lines.append("")
+        
+        # Advice and fix suggestion
+        lines.append(f"  ✏️  What to do:")
+        lines.append(f"     {ref.advice}")
+        if ref.fix_suggestion:
+            lines.append(f"     → {ref.fix_suggestion}")
+        lines.append("")
+        
+        # Verification links
+        if ref.manual_verify_links:
+            lines.append(f"  🔗 Verify here:")
+            for source, url in list(ref.manual_verify_links.items())[:2]:
+                lines.append(f"     • {source}: {url}")
+        lines.append("")
     
     def _render_json(self, report: VerificationReport) -> str:
         """Render as JSON."""
@@ -572,6 +681,35 @@ class ReportGenerator:
             background: #fef2f2; 
             border-color: var(--not-found);
         }}
+        .reference.definite-fake {{ 
+            background: #fee2e2; 
+            border-color: #dc2626;
+            border-width: 3px;
+        }}
+        .reference.likely-valid {{ 
+            background: #eff6ff; 
+            border-color: #3b82f6;
+        }}
+        
+        .advice-box {{
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: #fefce8;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }}
+        .advice-box .label {{
+            font-weight: bold;
+            color: #854d0e;
+        }}
+        .verify-links {{
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+        }}
+        .verify-links a {{
+            color: #2563eb;
+            margin-right: 1rem;
+        }}
         
         .reference-header {{
             display: flex;
@@ -683,46 +821,73 @@ class ReportGenerator:
             <h2>Flagged References</h2>
 '''
         
-        # Add flagged references
+        # Add flagged references (include DEFINITE_FAKE)
         flagged = [r for r in report.references 
-                   if r.verification_status in ["SUSPICIOUS", "NOT_FOUND", "ERROR"]]
+                   if r.verification_status in ["DEFINITE_FAKE", "SUSPICIOUS", "NOT_FOUND", "ERROR"]]
         
         if flagged:
             for ref in flagged:
                 status_class = ref.verification_status.lower().replace("_", "-")
                 citation = ref.raw_citation[:150] + "..." if len(ref.raw_citation) > 150 else ref.raw_citation
                 
+                # Icon based on status
+                icon = {"DEFINITE_FAKE": "🚨", "SUSPICIOUS": "⚠️", "NOT_FOUND": "❌", "ERROR": "💥"}.get(ref.verification_status, "?")
+                
                 html += f'''
             <div class="reference {status_class}">
                 <div class="reference-header">
-                    <span class="reference-number">[{ref.reference_number}]</span>
+                    <span class="reference-number">[{ref.reference_number}] {icon}</span>
                     <span class="status-badge {status_class}">{ref.verification_status}</span>
                 </div>
                 <div class="citation">"{citation}"</div>
                 <div class="confidence">Confidence: {ref.confidence:.0%}</div>
                 <div class="issues">
 '''
-                if ref.pubmed_pmid:
-                    html += f'                    <div class="issue">→ Partial match: PMID {ref.pubmed_pmid}</div>\n'
+                # Show fake indicators first (most important)
+                for indicator in ref.fake_indicators[:2]:
+                    html += f'                    <div class="issue" style="color: #dc2626; font-weight: bold;">🚨 {indicator}</div>\n'
                 
-                for disc in ref.discrepancies[:3]:
+                for disc in ref.discrepancies[:2]:
                     html += f'                    <div class="issue">→ {disc}</div>\n'
                 
                 if ref.doi_valid is False:
                     html += '                    <div class="issue">→ DOI does not resolve</div>\n'
                 
-                html += '''                </div>
-            </div>
+                # Add advice box
+                html += f'''                </div>
+                <div class="advice-box">
+                    <div class="label">✏️ What to do:</div>
+                    <div>{ref.advice}</div>
+                    <div style="margin-top: 0.25rem;">→ {ref.fix_suggestion}</div>
+                </div>
+'''
+                # Add verification links
+                if ref.manual_verify_links:
+                    html += '                <div class="verify-links">🔗 Verify: '
+                    for source, url in list(ref.manual_verify_links.items())[:2]:
+                        html += f'<a href="{url}" target="_blank">{source}</a> '
+                    html += '</div>\n'
+                
+                html += '''            </div>
 '''
         else:
-            html += '            <p style="text-align: center; color: var(--verified);">All references verified successfully!</p>\n'
+            html += '            <p style="text-align: center; color: var(--verified);">✅ All references verified successfully!</p>\n'
         
         html += f'''
         </div>
         
+        <div class="card">
+            <h2>💡 How to Verify References</h2>
+            <ul style="margin-left: 1.5rem; color: var(--muted);">
+                <li><a href="https://scholar.google.com" target="_blank">Google Scholar</a> - Search by title or author</li>
+                <li><a href="https://search.crossref.org" target="_blank">CrossRef</a> - Search academic databases</li>
+                <li><strong>DOI Check</strong> - Visit https://doi.org/[DOI] to verify</li>
+            </ul>
+        </div>
+        
         <div class="footer">
-            <p>Generated by PubMed Reference Checker v2.7.0</p>
-            <p>Powered by PubMed, DOI.org, and CrossRef</p>
+            <p>Generated by PubMed Reference Checker v2.8.1 | 和み (Nagomi)</p>
+            <p>Powered by PubMed, DOI.org, CrossRef, and OpenAlex</p>
         </div>
     </div>
 </body>
