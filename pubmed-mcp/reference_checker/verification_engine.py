@@ -89,6 +89,14 @@ class VerificationResult:
 # Confidence thresholds
 THRESHOLD_VERIFIED = 0.80
 THRESHOLD_SUSPICIOUS = 0.50
+THRESHOLD_TITLE_MATCH = 0.60  # Minimum title similarity to accept a match
+
+# Try to import rapidfuzz for better string similarity
+try:
+    from rapidfuzz import fuzz as rapidfuzz_fuzz
+    HAS_RAPIDFUZZ = True
+except ImportError:
+    HAS_RAPIDFUZZ = False
 
 # Medical/biomedical journal keywords (for field detection)
 MEDICAL_JOURNAL_KEYWORDS = {
@@ -135,9 +143,11 @@ class VerificationEngine:
     3. CrossRef API (fallback)
     """
     
-    # CrossRef API base URL
+    # API base URLs for multi-source fallback
     CROSSREF_API = "https://api.crossref.org/works"
     DOI_RESOLVER = "https://doi.org"
+    OPENALEX_API = "https://api.openalex.org/works"
+    EUROPE_PMC_API = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     
     def __init__(self, pubmed_client=None, email: Optional[str] = None):
         """
@@ -228,14 +238,46 @@ class VerificationEngine:
             if ref.year and ref.year > current_year:
                 fake_indicators.append(f"Future publication date: {ref.year} (currently {current_year})")
             
-            # === STEP 1: Check DOI if present (with retry) ===
+            # === STEP 1: Check DOI if present (with multi-source fallback) ===
+            doi_metadata = None
             if ref.doi and not any("Truncated" in fi for fi in fake_indicators):
+                # First try HEAD request with retry
                 doi_valid = await self._check_doi_with_retry(ref.doi)
                 sources_checked.append("DOI.org")
+                
                 if doi_valid:
                     best_confidence = max(best_confidence, 0.9)
+                    # Get metadata for Frankenstein detection
+                    _, doi_metadata = await self._multi_source_doi_check(ref.doi)
+                elif doi_valid is False:
+                    # DOI doesn't exist per doi.org, but try other sources
+                    doi_exists, doi_metadata = await self._multi_source_doi_check(ref.doi)
+                    sources_checked.append("CrossRef-DOI")
+                    sources_checked.append("OpenAlex")
+                    
+                    if doi_exists:
+                        doi_valid = True
+                        best_confidence = max(best_confidence, 0.85)
+                    else:
+                        discrepancies.append(f"DOI does not resolve (checked doi.org, CrossRef, OpenAlex): {ref.doi}")
                 else:
-                    discrepancies.append(f"DOI does not resolve: {ref.doi}")
+                    # Indeterminate (network issues) - try fallback sources
+                    doi_exists, doi_metadata = await self._multi_source_doi_check(ref.doi)
+                    if doi_exists:
+                        doi_valid = True
+                        best_confidence = max(best_confidence, 0.85)
+                        sources_checked.append("CrossRef-DOI")
+                
+                # Frankenstein detection: DOI exists but metadata doesn't match citation
+                if doi_valid and doi_metadata and ref.title:
+                    metadata_title = doi_metadata.get("title", "")
+                    if metadata_title:
+                        title_sim = self._string_similarity(ref.title.lower(), metadata_title.lower())
+                        if title_sim < 0.30:
+                            fake_indicators.append(
+                                f"FRANKENSTEIN CITATION: DOI resolves to different paper. "
+                                f"Cited: '{ref.title[:50]}...' vs DOI actual: '{metadata_title[:50]}...'"
+                            )
             
             # === STEP 2: Search PubMed ===
             pubmed_match = await self._check_pubmed(ref)
@@ -271,6 +313,26 @@ class VerificationEngine:
                             false_positive_warnings.append(
                                 f"Not in PubMed but found in CrossRef - this appears to be a non-medical "
                                 f"journal ('{crossref_match.journal}') which PubMed may not index"
+                            )
+            
+            # === STEP 3.5: If still no good match, try Europe PMC ===
+            if best_confidence < THRESHOLD_VERIFIED:
+                europe_pmc_result = await self._check_via_europe_pmc(ref)
+                if europe_pmc_result:
+                    sources_checked.append("Europe PMC")
+                    # Calculate confidence based on title match
+                    if europe_pmc_result.get("title") and ref.title:
+                        title_sim = self._string_similarity(
+                            ref.title.lower(), 
+                            europe_pmc_result["title"].lower()
+                        )
+                        pmc_confidence = title_sim * 0.8  # Slightly lower weight
+                        best_confidence = max(best_confidence, pmc_confidence)
+                        
+                        if pmc_confidence >= THRESHOLD_VERIFIED and not pubmed_match:
+                            false_positive_warnings.append(
+                                f"Found in Europe PMC (PMID: {europe_pmc_result.get('pmid', 'N/A')}) - "
+                                f"may be a European publication or preprint"
                             )
             
             # === STEP 4: Check for LIKELY_VALID indicators ===
@@ -317,6 +379,9 @@ class VerificationEngine:
                     status = VerificationStatus.DEFINITE_FAKE
                 # DOI points to completely different field = definitely fake  
                 elif any("field difference" in fi for fi in fake_indicators):
+                    status = VerificationStatus.DEFINITE_FAKE
+                # Frankenstein citation = definitely fake
+                elif any("FRANKENSTEIN" in fi for fi in fake_indicators):
                     status = VerificationStatus.DEFINITE_FAKE
                 else:
                     status = VerificationStatus.SUSPICIOUS
@@ -395,6 +460,36 @@ class VerificationEngine:
             return True
         
         return False
+
+    def _is_metadata_mismatch(self, ref: 'ParsedReference', match: PubMedMatch) -> bool:
+        """
+        Check for 'Frankenstein' citation: DOI exists but belongs to a different paper.
+        
+        Returns True if there is a significant mismatch between the cited title/year
+        and the metadata retrieved from the DOI resolution.
+        """
+        if not ref.title or not match.title:
+            return False
+
+        # Title Similarity Check
+        # Frankenstein cases often have completely different titles (e.g. "LLM feedback" vs "Scoping studies")
+        title_sim = self._string_similarity(ref.title.lower(), match.title.lower())
+        
+        # Threshold: If titles are less than 30% similar, it's extremely suspicious
+        if title_sim < 0.3:
+            return True
+            
+        # Year Check
+        # If years are widely apart (e.g. 2024 vs 2005)
+        if ref.year and match.year:
+            year_diff = abs(ref.year - match.year)
+            if year_diff > 5: # 5 year tolerance for reprints, but 20 is suspicious
+                 # Combining low-ish similarity with bad year
+                 if title_sim < 0.5:
+                     return True
+                     
+        return False
+
     
     async def _check_doi_with_retry(self, doi: str, max_retries: int = 3) -> bool:
         """Check if DOI resolves with retry logic for network issues."""
@@ -580,14 +675,220 @@ class VerificationEngine:
         except Exception:
             return None
     
+    async def _check_doi_via_crossref(self, doi: str) -> Optional[CrossRefMatch]:
+        """
+        Direct CrossRef lookup by DOI when HEAD request fails.
+        
+        This is more reliable than HEAD to doi.org because:
+        1. Some DOIs don't respond to HEAD but exist in CrossRef
+        2. CrossRef provides metadata to detect Frankenstein citations
+        """
+        try:
+            client = await self._get_http_client()
+            url = f"{self.CROSSREF_API}/{doi}"
+            
+            response = await client.get(url, timeout=15.0)
+            if response.status_code != 200:
+                return None
+            
+            data = response.json()
+            item = data.get("message", {})
+            
+            if not item:
+                return None
+            
+            # Extract metadata
+            title = ""
+            if item.get("title"):
+                title = item["title"][0] if isinstance(item["title"], list) else item["title"]
+            
+            authors = []
+            for author in item.get("author", []):
+                if author.get("family"):
+                    name = author.get("family", "")
+                    if author.get("given"):
+                        name = f"{author['given']} {name}"
+                    authors.append(name)
+            
+            year = None
+            if item.get("published-print", {}).get("date-parts"):
+                year = item["published-print"]["date-parts"][0][0]
+            elif item.get("published-online", {}).get("date-parts"):
+                year = item["published-online"]["date-parts"][0][0]
+            
+            journal = None
+            if item.get("container-title"):
+                journal = item["container-title"][0] if isinstance(item["container-title"], list) else item["container-title"]
+            
+            return CrossRefMatch(
+                doi=doi,
+                title=title,
+                authors=authors,
+                year=year,
+                journal=journal,
+                confidence=1.0  # Direct DOI match = high confidence
+            )
+            
+        except Exception:
+            return None
+    
+    async def _check_doi_via_openalex(self, doi: str) -> Optional[dict]:
+        """
+        OpenAlex lookup by DOI - free API, no key required.
+        
+        Returns dict with title, authors, year for Frankenstein detection.
+        """
+        try:
+            client = await self._get_http_client()
+            # OpenAlex uses doi: prefix in the URL
+            url = f"{self.OPENALEX_API}/doi:{doi}"
+            
+            response = await client.get(url, timeout=15.0)
+            if response.status_code != 200:
+                return None
+            
+            data = response.json()
+            
+            title = data.get("title", "")
+            year = data.get("publication_year")
+            
+            authors = []
+            for authorship in data.get("authorships", []):
+                author = authorship.get("author", {})
+                if author.get("display_name"):
+                    authors.append(author["display_name"])
+            
+            journal = None
+            primary_location = data.get("primary_location", {})
+            if primary_location:
+                source = primary_location.get("source", {})
+                if source:
+                    journal = source.get("display_name")
+            
+            return {
+                "doi": doi,
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "journal": journal,
+                "source": "OpenAlex"
+            }
+            
+        except Exception:
+            return None
+    
+    async def _check_via_europe_pmc(self, ref: 'ParsedReference') -> Optional[dict]:
+        """
+        Europe PMC search - better coverage for European biomedical papers.
+        
+        Also indexes preprints and has different coverage than PubMed.
+        """
+        try:
+            client = await self._get_http_client()
+            
+            # Build query
+            query_parts = []
+            if ref.title:
+                # Use first 100 chars of title
+                clean_title = re.sub(r'[^\w\s]', '', ref.title)[:100]
+                query_parts.append(f'TITLE:"{clean_title}"')
+            
+            if ref.authors and len(ref.authors) > 0:
+                first_author = ref.authors[0].split(',')[0]
+                query_parts.append(f'AUTH:"{first_author}"')
+            
+            if not query_parts:
+                return None
+            
+            query = " AND ".join(query_parts)
+            
+            params = {
+                "query": query,
+                "format": "json",
+                "pageSize": 5,
+                "resultType": "core"
+            }
+            
+            response = await client.get(self.EUROPE_PMC_API, params=params)
+            if response.status_code != 200:
+                return None
+            
+            data = response.json()
+            results = data.get("resultList", {}).get("result", [])
+            
+            if not results:
+                return None
+            
+            # Take first result
+            item = results[0]
+            
+            authors = []
+            if item.get("authorString"):
+                # "Smith J, Jones B, et al." -> ["Smith J", "Jones B"]
+                author_str = item["authorString"].replace(" et al.", "")
+                authors = [a.strip() for a in author_str.split(",")]
+            
+            return {
+                "pmid": item.get("pmid"),
+                "pmcid": item.get("pmcid"),
+                "doi": item.get("doi"),
+                "title": item.get("title", ""),
+                "authors": authors,
+                "year": int(item.get("pubYear", 0)) if item.get("pubYear") else None,
+                "journal": item.get("journalTitle"),
+                "source": "Europe PMC"
+            }
+            
+        except Exception:
+            return None
+    
+    async def _multi_source_doi_check(self, doi: str) -> tuple:
+        """
+        Try multiple sources to verify DOI exists and get metadata.
+        
+        Returns:
+            (exists: bool, metadata: Optional[dict])
+            - exists: True if DOI found in any source
+            - metadata: Dict with title, authors, year from best source
+        """
+        # Try CrossRef direct lookup first (most reliable)
+        crossref_result = await self._check_doi_via_crossref(doi)
+        if crossref_result:
+            return True, {
+                "title": crossref_result.title,
+                "authors": crossref_result.authors,
+                "year": crossref_result.year,
+                "journal": crossref_result.journal,
+                "source": "CrossRef"
+            }
+        
+        # Try OpenAlex
+        openalex_result = await self._check_doi_via_openalex(doi)
+        if openalex_result:
+            return True, openalex_result
+        
+        # If all fail, DOI likely doesn't exist
+        return False, None
+    
     def _calculate_match_confidence(self, ref: 'ParsedReference', article) -> float:
-        """Calculate fuzzy match confidence between reference and PubMed article."""
+        """
+        Calculate fuzzy match confidence between reference and PubMed article.
+        
+        IMPORTANT: Enforces minimum title similarity threshold (THRESHOLD_TITLE_MATCH)
+        to prevent false positives where author matches but title is completely different.
+        """
         scores = []
+        title_sim = 0.0
         
         # Title similarity (60% weight)
         if ref.title and article.title:
             title_sim = self._string_similarity(ref.title.lower(), article.title.lower())
             scores.append(("title", title_sim, 0.6))
+            
+            # CRITICAL: Reject match entirely if title similarity is too low
+            # This prevents "Frankenstein" matches where author matches but paper is wrong
+            if title_sim < THRESHOLD_TITLE_MATCH:
+                return 0.0  # Reject this match
         
         # Author match (25% weight)
         if ref.authors and article.authors:
@@ -612,13 +913,23 @@ class VerificationEngine:
         return weighted_sum / total_weight if total_weight > 0 else 0.0
     
     def _calculate_crossref_confidence(self, ref: 'ParsedReference', item: dict) -> float:
-        """Calculate confidence for CrossRef match."""
+        """
+        Calculate confidence for CrossRef match.
+        
+        Enforces minimum title similarity threshold to prevent false positives.
+        """
         scores = []
+        title_sim = 0.0
         
         # Title similarity
         if ref.title and item.get("title"):
             item_title = item["title"][0] if isinstance(item["title"], list) else item["title"]
             title_sim = self._string_similarity(ref.title.lower(), item_title.lower())
+            
+            # CRITICAL: Reject match if title is too different
+            if title_sim < THRESHOLD_TITLE_MATCH:
+                return 0.0
+            
             scores.append(title_sim * 0.6)
         
         # Author match
@@ -641,18 +952,36 @@ class VerificationEngine:
         return sum(scores) if scores else 0.0
     
     def _string_similarity(self, s1: str, s2: str) -> float:
-        """Calculate string similarity using token overlap."""
-        # Simple token-based similarity
-        tokens1 = set(re.findall(r'\w+', s1.lower()))
-        tokens2 = set(re.findall(r'\w+', s2.lower()))
+        """
+        Calculate string similarity using best available method.
         
-        if not tokens1 or not tokens2:
+        Uses rapidfuzz if available (much better for typos, word order variations),
+        falls back to token overlap Jaccard if not.
+        """
+        if not s1 or not s2:
             return 0.0
         
-        intersection = tokens1 & tokens2
-        union = tokens1 | tokens2
+        # Normalize strings
+        s1_clean = s1.lower().strip()
+        s2_clean = s2.lower().strip()
         
-        return len(intersection) / len(union) if union else 0.0
+        if HAS_RAPIDFUZZ:
+            # Use token_set_ratio which handles word order and partial matches well
+            # Returns 0-100, we need 0.0-1.0
+            score = rapidfuzz_fuzz.token_set_ratio(s1_clean, s2_clean) / 100.0
+            return score
+        else:
+            # Fallback: token-based Jaccard similarity
+            tokens1 = set(re.findall(r'\w+', s1_clean))
+            tokens2 = set(re.findall(r'\w+', s2_clean))
+            
+            if not tokens1 or not tokens2:
+                return 0.0
+            
+            intersection = tokens1 & tokens2
+            union = tokens1 | tokens2
+            
+            return len(intersection) / len(union) if union else 0.0
     
     def _author_similarity(self, ref_authors: List[str], article_authors: List[str]) -> float:
         """Calculate author list similarity."""
@@ -679,6 +1008,13 @@ class VerificationEngine:
     def _find_discrepancies(self, ref: 'ParsedReference', match: PubMedMatch) -> List[str]:
         """Find discrepancies between reference and matched article."""
         discrepancies = []
+        
+        # Check for Frankenstein mismatch (Wrong DOI)
+        if self._is_metadata_mismatch(ref, match):
+             discrepancies.append(
+                 f"METADATA MISMATCH: Cited '{ref.title[:50]}...' ({ref.year}) but DOI resolves to "
+                 f"'{match.title[:50]}...' ({match.year}). This DOI likely belongs to a different paper."
+             )
         
         # Year mismatch
         if ref.year and match.year and ref.year != match.year:

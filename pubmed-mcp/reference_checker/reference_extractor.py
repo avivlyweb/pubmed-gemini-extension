@@ -178,9 +178,40 @@ class ReferenceExtractor:
         """Parse multiple citation entries."""
         return [self.extract(entry, i + 1) for i, entry in enumerate(entries)]
     
+    def _normalize_doi_text(self, text: str) -> str:
+        """
+        Reconstruct DOIs that may be split across lines in PDFs.
+        
+        Handles:
+        - Soft hyphens (Unicode U+00AD)
+        - Hyphen-continued lines: "10.1186/s12909-\n024-06399-7" → "10.1186/s12909-024-06399-7"
+        - Space-split DOIs: "10.1234/abc def" → "10.1234/abcdef"
+        - Line breaks within DOIs
+        """
+        # Remove soft hyphens (invisible characters used for line breaks)
+        text = text.replace('\u00ad', '')
+        
+        # Join hyphen-continued lines: "abc-\n  def" → "abc-def"
+        # This handles DOIs split with hyphen at line end
+        text = re.sub(r'-\s*[\n\r]+\s*', '-', text)
+        
+        # Join DOI-specific line breaks: "10.1234/x\n  y" → "10.1234/xy"
+        # Match a partial DOI followed by newline and continuation
+        text = re.sub(r'(10\.\d{4,}/[^\s\n]*?)[\n\r]+\s*([^\s\n]+)', r'\1\2', text)
+        
+        # Remove spaces within DOI suffix (PDF parsing artifact)
+        # "10.1186/s12909-024-06399- 7" → "10.1186/s12909-024-06399-7"
+        # Only do this for patterns that look like broken DOIs
+        text = re.sub(r'(10\.\d{4,}/\S+)-\s+(\d)', r'\1-\2', text)
+        
+        return text
+    
     def _extract_doi(self, text: str) -> Optional[str]:
-        """Extract DOI from text."""
-        match = self.DOI_PATTERN.search(text)
+        """Extract DOI from text, handling line breaks and PDF parsing artifacts."""
+        # First, normalize the text to reconstruct split DOIs
+        normalized = self._normalize_doi_text(text)
+        
+        match = self.DOI_PATTERN.search(normalized)
         if match:
             # Get the first non-None group
             for group in match.groups():
@@ -188,6 +219,16 @@ class ReferenceExtractor:
                     # Clean up DOI (remove trailing punctuation)
                     doi = re.sub(r'[.,;:\s]+$', '', group)
                     return doi
+        
+        # Fallback: try original text if normalization didn't help
+        if normalized != text:
+            match = self.DOI_PATTERN.search(text)
+            if match:
+                for group in match.groups():
+                    if group:
+                        doi = re.sub(r'[.,;:\s]+$', '', group)
+                        return doi
+        
         return None
     
     def _extract_pmid(self, text: str) -> Optional[str]:

@@ -11,5 +11,9 @@ PyMuPDF>=1.23.0
 # Word document parsing
 python-docx>=1.1.0
 
+# Fuzzy string matching for title similarity (v2.8.0)
+# Optional but recommended - falls back to token overlap if not installed
+rapidfuzz>=3.0.0
+
 # HTML to PDF conversion (optional - for PDF report generation)
 # weasyprint>=60.0  # Uncomment if PDF reports needed (has system dependencies)
