@@ -1,7 +1,7 @@
 {
   "name": "pubmed-gemini-extension",
-  "version": "2.7.0",
-  "description": "PubMed MCP server for Gemini CLI - PhD-level medical research analysis with AI-powered evidence synthesis and reference verification",
+  "version": "3.0.0",
+  "description": "PubMed MCP server for Gemini CLI - PhD-level medical research analysis with AI-powered evidence synthesis and ABC-TOM intelligent reference verification",
   "type": "module",
   "main": "pubmed-wrapper.js",
   "scripts": {
@@ -23,6 +23,9 @@
     "evidence-based-medicine",
     "clinical-research",
     "ai-synthesis",
+    "reference-verification",
+    "fake-citation-detection",
+    "abc-tom",
     "mcp-server",
     "gemini-cli-extension"
   ],

@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0] - 2025-02-04
+
+### Major Feature: ABC-TOM Intelligent Reference Verification
+
+Complete overhaul of the reference verification system with the ABC-TOM (Agents, Brain, Core, Tools, Output, Memory) framework for intelligent fake citation detection.
+
+### Added
+
+#### 6-Tier Classification System
+Replaces the previous binary verification with nuanced classifications:
+
+| Status | Meaning |
+|--------|---------|
+| `VERIFIED` | Exact match in PubMed/CrossRef |
+| `VERIFIED_LEGACY_DOI` | Paper verified but DOI is broken/migrated |
+| `GREY_LITERATURE` | Valid source not indexed (WHO, AHRQ, guidelines) |
+| `LOW_QUALITY_SOURCE` | Real but not peer-reviewed (ResearchGate, preprints) |
+| `SUSPICIOUS` | Partial match with discrepancies (>50% mismatch) |
+| `NOT_FOUND` | No match in any database |
+| `DEFINITE_FAKE` | Frankenstein citation or impossible data |
+
+#### Grey Literature Detection
+Automatic detection of valid non-indexed sources:
+- Government organizations (WHO, CDC, NIH, AHRQ, FDA, NHS)
+- Clinical guidelines (NICE, SIGN, Cochrane, PRISMA, CONSORT)
+- Reporting standards (STROBE, MOOSE, STARD, TRIPOD)
+- Books and software citations
+
+#### Frankenstein Citation Detection
+Detects sophisticated AI hallucinations where:
+- A real DOI is attached to a fake paper title
+- DOI resolves but to a completely different paper
+- Real author names combined with fabricated content
+
+#### PDF Layout Issue Detection
+New batch-level analysis to distinguish parsing problems from hallucinations:
+- 70%+ failure rate with 0 definite fakes = likely PDF layout issue
+- Detects column breaks, hyphenation splits, footer contamination
+- Provides actionable recommendations
+
+#### Year Tolerance for Online First
+- Accepts +/-1 year difference for "Online First" publications
+- Reduces false positives for recently published papers
+- +/-2 year gets partial credit, >2 year is suspicious
+
+#### Enhanced Text Cleaning
+Automatic removal of PDF parsing noise:
+- "Downloaded from..." watermarks
+- "Access provided by..." headers
+- Volume/page numbers on separate lines
+- Copyright notices
+- Hyphenation fixes (pharma-\ncology -> pharmacology)
+
+#### ABC-TOM Framework Reference
+The `/ABC-TOM` folder contains the verification philosophy:
+- `A-agents/`: Agent role definitions
+- `C-core/`: Core identity and principles
+- `M-memory/`: Learning log with known patterns
+- `T-tools/`: Verification protocols
+
+### Changed
+
+#### GEMINI.md Updates
+- Comprehensive 6-tier classification documentation
+- Detection pattern explanations
+- Batch analysis interpretation guide
+- Educational guidance for AI responses
+
+#### verify.toml Command Prompt
+- ABC-TOM classification system integrated
+- Detection patterns documented
+- Educational response guidance
+
+#### Report Generator
+- New status icons for all 6 tiers
+- Advice templates for each classification
+- Batch analysis summary with pattern detection
+- Updated terminal, JSON, and HTML output formats
+
+### Technical
+
+- `verification_engine.py`: +200 lines for classification logic
+- `reference_extractor.py`: +50 lines for text cleaning
+- `report_generator.py`: +100 lines for new statuses
+- Added `analyze_batch_results()` method for pattern detection
+- Added grey literature and low quality source detection methods
+- Extended `VerificationStatus` enum with 3 new values
+
+### Notes
+
+- **Breaking Change**: New verification status values may require updates to code that parses verification results
+- **ABC-TOM folder**: Kept as reference documentation for contributors
+- All existing tools remain unchanged and fully backward compatible
+
+---
+
 ## [2.7.0] - 2025-01-31
 
 ### Added
@@ -248,16 +344,16 @@ This project uses [Semantic Versioning](https://semver.org/):
 
 ## Upcoming Features
 
-### Planned for v2.3.0
-- **Contradiction Explainer**: Why do some studies disagree?
-- **Population Matching**: Flag when studies used different populations
-- Citation export (BibTeX, RIS, EndNote)
-- Integration with Cochrane Library
-
-### Planned for v3.0.0
+### Planned for v3.1.0
 - **Effect Size Extraction**: How big is the effect?
 - **NNT Calculator**: Number needed to treat
+- **Contradiction Explainer Improvements**: Why do some studies disagree?
+- Integration with Cochrane Library
+
+### Planned for v4.0.0
 - Multi-language abstract translation
+- Real-time PubMed alerts
+- Citation network analysis
 
 ---
 

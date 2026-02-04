@@ -56,6 +56,10 @@ class BatchSummary:
     not_found_count: int
     definite_fake_count: int = 0
     likely_valid_count: int = 0
+    # ABC-TOM v3.0.0: New classification counts
+    verified_legacy_doi_count: int = 0
+    grey_literature_count: int = 0
+    low_quality_source_count: int = 0
     documents: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -73,6 +77,14 @@ class VerificationReport:
     # NEW: Additional status counts
     definite_fake_count: int = 0
     likely_valid_count: int = 0
+    
+    # ABC-TOM v3.0.0: New classification counts
+    verified_legacy_doi_count: int = 0
+    grey_literature_count: int = 0
+    low_quality_source_count: int = 0
+    
+    # Batch analysis results
+    batch_analysis: Optional[Dict[str, Any]] = None
     
     # Detailed results
     references: List[ReferenceReport] = field(default_factory=list)
@@ -92,47 +104,64 @@ class VerificationReport:
 class ReportGenerator:
     """
     Generate verification reports in multiple formats.
+    
+    ABC-TOM v3.0.0: Enhanced with 6-tier classification system.
     """
     
-    # Status symbols for terminal output
+    # Status symbols for terminal output (ABC-TOM 6-tier classification)
     STATUS_SYMBOLS = {
-        "VERIFIED": ("✅", "\033[92m"),      # Green
-        "SUSPICIOUS": ("⚠️", "\033[93m"),    # Yellow
-        "NOT_FOUND": ("❌", "\033[91m"),     # Red
-        "DEFINITE_FAKE": ("🚨", "\033[91m"), # Red (strong)
-        "LIKELY_VALID": ("ℹ️", "\033[94m"),   # Blue
-        "UNPARSEABLE": ("❓", "\033[90m"),   # Gray
-        "ERROR": ("💥", "\033[91m"),         # Red
+        "VERIFIED": ("OK", "\033[92m"),            # Green
+        "VERIFIED_LEGACY_DOI": ("LEGACY", "\033[96m"),  # Cyan
+        "GREY_LITERATURE": ("GREY", "\033[94m"),   # Blue
+        "LOW_QUALITY_SOURCE": ("LOW", "\033[93m"), # Yellow
+        "SUSPICIOUS": ("WARN", "\033[93m"),        # Yellow
+        "NOT_FOUND": ("MISS", "\033[91m"),         # Red
+        "DEFINITE_FAKE": ("FAKE", "\033[91m"),     # Red (strong)
+        "LIKELY_VALID": ("INFO", "\033[94m"),      # Blue
+        "UNPARSEABLE": ("ERR", "\033[90m"),        # Gray
+        "ERROR": ("ERR", "\033[91m"),              # Red
     }
     
     RESET_COLOR = "\033[0m"
     BOLD = "\033[1m"
     
-    # Advice templates for each status
+    # Advice templates for each status (ABC-TOM v3.0.0)
     ADVICE_TEMPLATES = {
         "DEFINITE_FAKE": {
             "advice": "REMOVE or REPLACE this reference immediately. It shows clear signs of fabrication.",
-            "icon": "🚨"
+            "icon": "FAKE"
         },
         "NOT_FOUND": {
             "advice": "Verify manually using Google Scholar. May be legitimate grey literature or a very new publication.",
-            "icon": "❌"
+            "icon": "MISS"
         },
         "SUSPICIOUS": {
             "advice": "Check the DOI and metadata carefully. The reference exists but has discrepancies.",
-            "icon": "⚠️"
+            "icon": "WARN"
         },
         "LIKELY_VALID": {
             "advice": "Probably valid. Not in PubMed because it's outside biomedical scope (book, non-medical journal, etc.).",
-            "icon": "ℹ️"
+            "icon": "INFO"
         },
         "VERIFIED": {
             "advice": "No action needed. Reference verified in databases.",
-            "icon": "✅"
+            "icon": "OK"
+        },
+        "VERIFIED_LEGACY_DOI": {
+            "advice": "Paper verified but DOI is broken/migrated. Consider updating the DOI.",
+            "icon": "LEGACY"
+        },
+        "GREY_LITERATURE": {
+            "advice": "Valid grey literature (government report, guideline, etc.). Not indexed in PubMed but legitimate.",
+            "icon": "GREY"
+        },
+        "LOW_QUALITY_SOURCE": {
+            "advice": "Real source but not peer-reviewed (preprint, ResearchGate, etc.). Consider replacing with peer-reviewed version.",
+            "icon": "LOW"
         },
         "ERROR": {
             "advice": "Could not verify due to technical error. Try again or verify manually.",
-            "icon": "💥"
+            "icon": "ERR"
         }
     }
     
@@ -199,6 +228,39 @@ class ReportGenerator:
                 else:
                     fix_suggestion = "No action needed - this appears legitimate but is outside database coverage."
         
+        # ABC-TOM v3.0.0: New status types
+        elif status == "VERIFIED_LEGACY_DOI":
+            if ref_report.false_positive_warnings:
+                fix_suggestion = "Consider updating the DOI to a working version, or remove it and cite by title/journal."
+            else:
+                fix_suggestion = "The DOI is broken but the paper exists. Optionally update the DOI."
+        
+        elif status == "GREY_LITERATURE":
+            if ref_report.false_positive_warnings:
+                warning = ref_report.false_positive_warnings[0].lower()
+                if "who" in warning or "government" in warning:
+                    fix_suggestion = "Government/WHO reports are valid sources. Ensure proper citation format for grey literature."
+                elif "guideline" in warning:
+                    fix_suggestion = "Clinical guidelines are valid grey literature. Use proper guideline citation format."
+                elif "book" in warning or "software" in warning:
+                    fix_suggestion = "Books and software have different citation formats. Verify correct format is used."
+                else:
+                    fix_suggestion = "This is valid grey literature. Ensure you're using the appropriate citation format."
+            else:
+                fix_suggestion = "Grey literature source (not indexed in academic databases). Consider if a peer-reviewed alternative exists."
+        
+        elif status == "LOW_QUALITY_SOURCE":
+            if ref_report.false_positive_warnings:
+                warning = ref_report.false_positive_warnings[0].lower()
+                if "preprint" in warning:
+                    fix_suggestion = "Check if this preprint has been published in a peer-reviewed journal and cite that instead."
+                elif "researchgate" in warning:
+                    fix_suggestion = "Find the original published version of this paper instead of the ResearchGate copy."
+                else:
+                    fix_suggestion = "Consider replacing with a peer-reviewed source if one exists."
+            else:
+                fix_suggestion = "Non-peer-reviewed source. Consider replacing with peer-reviewed version if available."
+        
         return advice, fix_suggestion
     
     def build_report(self, 
@@ -222,9 +284,10 @@ class ReportGenerator:
         """
         from datetime import datetime
         
-        # Count by status
+        # Count by status (ABC-TOM 6-tier classification)
         verified = suspicious = not_found = errors = 0
         definite_fake = likely_valid = 0
+        verified_legacy_doi = grey_literature = low_quality_source = 0
         reference_reports = []
         apa_errors_total = 0
         apa_warnings_total = 0
@@ -235,6 +298,12 @@ class ReportGenerator:
             
             if status == "VERIFIED":
                 verified += 1
+            elif status == "VERIFIED_LEGACY_DOI":
+                verified_legacy_doi += 1
+            elif status == "GREY_LITERATURE":
+                grey_literature += 1
+            elif status == "LOW_QUALITY_SOURCE":
+                low_quality_source += 1
             elif status == "SUSPICIOUS":
                 suspicious += 1
             elif status == "NOT_FOUND":
@@ -307,6 +376,10 @@ class ReportGenerator:
             error_count=errors,
             definite_fake_count=definite_fake,
             likely_valid_count=likely_valid,
+            # ABC-TOM v3.0.0: New classification counts
+            verified_legacy_doi_count=verified_legacy_doi,
+            grey_literature_count=grey_literature,
+            low_quality_source_count=low_quality_source,
             references=reference_reports,
             apa_errors_total=apa_errors_total,
             apa_warnings_total=apa_warnings_total,

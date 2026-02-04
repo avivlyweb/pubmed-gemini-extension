@@ -44,7 +44,28 @@ class ReferenceExtractor:
     Parse individual citations into structured data.
     
     Handles APA 7th Edition format primarily, with fallbacks for other styles.
+    
+    ABC-TOM v3.0.0: Includes text cleaning to remove PDF noise (headers, footers, etc.)
     """
+    
+    # ==========================================================================
+    # ABC-TOM v3.0.0: PDF Noise Patterns to Filter
+    # ==========================================================================
+    PDF_NOISE_PATTERNS = [
+        re.compile(r'^Downloaded from.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Available at.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Access provided by.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Vol\s*\d+.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Volume\s*\d+.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Copyright\s*©?.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^All rights reserved.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^\s*\d{1,3}\s*$', re.MULTILINE),  # Page numbers only
+        re.compile(r'^https?://[^\s]+\s*$', re.MULTILINE),  # Bare URLs on own line
+        re.compile(r'^This article.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Author.*manuscript.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Funding.*$', re.IGNORECASE | re.MULTILINE),
+        re.compile(r'^Conflict of interest.*$', re.IGNORECASE | re.MULTILINE),
+    ]
     
     # Regex patterns for extraction
     
@@ -102,8 +123,11 @@ class ReferenceExtractor:
         Returns:
             ParsedReference with extracted fields
         """
+        # ABC-TOM v3.0.0: Clean PDF noise before parsing
+        cleaned_text = self.clean_pdf_noise(raw_text)
+        
         ref = ParsedReference(
-            raw_text=raw_text.strip(),
+            raw_text=raw_text.strip(),  # Keep original for reference
             reference_number=reference_number
         )
         
@@ -111,19 +135,19 @@ class ReferenceExtractor:
         confidence_scores = []
         
         # Extract DOI first (most reliable identifier)
-        doi = self._extract_doi(raw_text)
+        doi = self._extract_doi(cleaned_text)
         if doi:
             ref.doi = doi
             confidence_scores.append(1.0)
         
         # Extract PMID
-        pmid = self._extract_pmid(raw_text)
+        pmid = self._extract_pmid(cleaned_text)
         if pmid:
             ref.pmid = pmid
             confidence_scores.append(1.0)
         
         # Extract year
-        year = self._extract_year(raw_text)
+        year = self._extract_year(cleaned_text)
         if year:
             ref.year = year
             confidence_scores.append(0.9)
@@ -131,7 +155,7 @@ class ReferenceExtractor:
             warnings.append("Could not extract publication year")
         
         # Extract authors
-        authors = self._extract_authors(raw_text)
+        authors = self._extract_authors(cleaned_text)
         if authors:
             ref.authors = authors
             confidence_scores.append(0.8)
@@ -139,7 +163,7 @@ class ReferenceExtractor:
             warnings.append("Could not extract authors")
         
         # Extract title (text between year and journal/volume)
-        title = self._extract_title(raw_text, year)
+        title = self._extract_title(cleaned_text, year)
         if title:
             ref.title = title
             confidence_scores.append(0.7)
@@ -147,7 +171,7 @@ class ReferenceExtractor:
             warnings.append("Could not extract title")
         
         # Extract journal and volume/issue/pages
-        journal, volume, issue, pages = self._extract_journal_info(raw_text)
+        journal, volume, issue, pages = self._extract_journal_info(cleaned_text)
         if journal:
             ref.journal = journal
             confidence_scores.append(0.6)
@@ -159,7 +183,7 @@ class ReferenceExtractor:
             ref.pages = pages
         
         # Extract URL
-        url = self._extract_url(raw_text)
+        url = self._extract_url(cleaned_text)
         if url and not ref.doi:  # Don't duplicate DOI URLs
             ref.url = url
         
@@ -173,6 +197,46 @@ class ReferenceExtractor:
         ref.parse_warnings = warnings
         
         return ref
+    
+    def clean_pdf_noise(self, text: str) -> str:
+        """
+        Remove common PDF parsing noise from reference text.
+        
+        ABC-TOM Learning Log patterns:
+        - "Downloaded from..." lines (page footers)
+        - "Vol 59..." lines (header contamination)
+        - Page numbers on their own line
+        - Copyright notices
+        - "Access provided by..." watermarks
+        
+        Also fixes:
+        - Hyphenation splits: "pharma-\\ncology" -> "pharmacology"
+        - Excessive whitespace
+        """
+        if not text:
+            return text
+        
+        cleaned = text
+        
+        # Remove lines matching noise patterns
+        for pattern in self.PDF_NOISE_PATTERNS:
+            cleaned = pattern.sub('', cleaned)
+        
+        # Fix hyphenation splits (word-\nontinuation -> wordcontinuation)
+        # But preserve intentional hyphens (e.g., "well-known")
+        cleaned = re.sub(r'(\w)-\s*\n\s*(\w)', r'\1\2', cleaned)
+        
+        # Collapse multiple newlines into single newline
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        
+        # Collapse multiple spaces into single space
+        cleaned = re.sub(r' {2,}', ' ', cleaned)
+        
+        # Strip leading/trailing whitespace from each line
+        lines = [line.strip() for line in cleaned.split('\n')]
+        cleaned = '\n'.join(line for line in lines if line)
+        
+        return cleaned.strip()
     
     def extract_batch(self, entries: List[str]) -> List[ParsedReference]:
         """Parse multiple citation entries."""

@@ -17,14 +17,29 @@ from enum import Enum
 
 
 class VerificationStatus(str, Enum):
-    """Status of reference verification."""
-    VERIFIED = "VERIFIED"           # High confidence match found
-    SUSPICIOUS = "SUSPICIOUS"       # Partial match, some discrepancies
-    NOT_FOUND = "NOT_FOUND"         # No match found in databases
-    DEFINITE_FAKE = "DEFINITE_FAKE" # 100% certain fake (DOI points to wrong paper, impossible dates)
-    LIKELY_VALID = "LIKELY_VALID"   # Probably valid but not in our databases (grey literature, non-medical)
-    UNPARSEABLE = "UNPARSEABLE"     # Could not parse reference
-    ERROR = "ERROR"                 # Verification error occurred
+    """
+    Status of reference verification.
+    
+    ABC-TOM 6-Tier Classification System (v3.0.0):
+    - VERIFIED: Exact match or "Online First" with +/-1 year tolerance
+    - VERIFIED_LEGACY_DOI: Title matches but DOI is broken/migrated (common in older papers)
+    - GREY_LITERATURE: Valid source not indexed in PubMed (WHO, AHRQ, guidelines, reports)
+    - LOW_QUALITY_SOURCE: Real but not peer-reviewed (ResearchGate, Wikipedia, preprints)
+    - SUSPICIOUS: Partial match (>50% title mismatch or author mismatch)
+    - NOT_FOUND: No match found anywhere
+    - DEFINITE_FAKE: "Frankenstein" citation (DOI to wrong paper) or impossible dates
+    - LIKELY_VALID: Probably valid but couldn't fully verify
+    """
+    VERIFIED = "VERIFIED"                       # High confidence exact match
+    VERIFIED_LEGACY_DOI = "VERIFIED_LEGACY_DOI" # Title matches but DOI broken/migrated
+    GREY_LITERATURE = "GREY_LITERATURE"         # Valid non-indexed source (WHO, AHRQ, guidelines)
+    LOW_QUALITY_SOURCE = "LOW_QUALITY_SOURCE"   # Real but not peer-reviewed (ResearchGate, preprints)
+    SUSPICIOUS = "SUSPICIOUS"                   # Partial match, some discrepancies
+    NOT_FOUND = "NOT_FOUND"                     # No match found in databases
+    DEFINITE_FAKE = "DEFINITE_FAKE"             # 100% certain fake (Frankenstein, impossible dates)
+    LIKELY_VALID = "LIKELY_VALID"               # Probably valid but not in our databases
+    UNPARSEABLE = "UNPARSEABLE"                 # Could not parse reference
+    ERROR = "ERROR"                             # Verification error occurred
 
 
 class FakeIndicator(str, Enum):
@@ -122,6 +137,70 @@ NON_MEDICAL_INDICATORS = {
     'environment', 'ecology', 'sustainability', 'energy', 'renewable', 'climate',
     'expert systems', 'decision support', 'automation', 'robotics', 'ieee', 'acm'
 }
+
+# =============================================================================
+# ABC-TOM v3.0.0: Grey Literature & Source Quality Detection
+# =============================================================================
+
+# Grey literature keywords - valid sources that won't be in PubMed
+GREY_LITERATURE_KEYWORDS = {
+    # International/government organizations
+    'who', 'world health organization', 'ahrq', 'agency for healthcare',
+    'cdc', 'centers for disease control', 'nih', 'national institutes',
+    'fda', 'food and drug administration', 'ema', 'european medicines agency',
+    'nhs', 'national health service', 'public health england', 'public health agency',
+    'department of health', 'ministry of health', 'health canada',
+    # Guidelines and standards
+    'guideline', 'guidelines', 'guidance', 'recommendation', 'recommendations',
+    'policy', 'policy brief', 'white paper', 'technical report', 'consensus statement',
+    'position statement', 'practice parameter', 'clinical pathway',
+    # Reporting standards (valid methodological references)
+    'cochrane', 'nice', 'sign', 'prisma', 'consort', 'strobe', 'moose',
+    'stard', 'tripod', 'arrive', 'equator', 'grade', 'agree',
+    # Statistics/classifications
+    'icd-10', 'icd-11', 'dsm-5', 'dsm-iv', 'icf', 'snomed',
+}
+
+# Book/software keywords - valid but different source types
+BOOK_SOFTWARE_KEYWORDS = {
+    # Books
+    'handbook', 'textbook', 'manual', 'edition', 'ed.', 'eds.', 'editor', 'editors',
+    'chapter', 'volume', 'vol.', 'publisher', 'press', 'isbn',
+    'oxford', 'cambridge', 'springer', 'wiley', 'elsevier', 'mcgraw-hill',
+    # Software citations
+    'spss', 'stata', 'r software', 'r core team', 'r foundation', 'python',
+    'mplus', 'amos', 'sas', 'graphpad', 'prism', 'endnote', 'nvivo',
+    'revman', 'review manager', 'gpower', 'jamovi',
+    # Statistical methods (often cited as grey lit)
+    'ibm corp', 'microsoft', 'version', 'software',
+}
+
+# Low quality source indicators - real but not peer-reviewed
+LOW_QUALITY_INDICATORS = {
+    # Pre-print servers (valid but not peer-reviewed)
+    'arxiv', 'biorxiv', 'medrxiv', 'ssrn', 'preprint', 'preprints',
+    'chemrxiv', 'psyarxiv', 'osf preprints',
+    # Academic social networks
+    'researchgate', 'academia.edu', 'mendeley',
+    # Non-peer-reviewed web sources
+    'wikipedia', 'medium.com', 'blog', 'weblog',
+    'youtube', 'podcast', 'twitter', 'x.com',
+    # News/popular sources
+    'news', 'times', 'post', 'bbc', 'cnn', 'reuters',
+}
+
+# PDF noise patterns to filter during text cleaning
+PDF_NOISE_PATTERNS = [
+    r'^Downloaded from.*$',
+    r'^Available at.*$',
+    r'^Access provided by.*$',
+    r'^Vol\s*\d+.*$',
+    r'^Volume\s*\d+.*$',
+    r'^Copyright\s*©?.*$',
+    r'^All rights reserved.*$',
+    r'^\d+\s*$',  # Page numbers only
+    r'^https?://.*$',  # Bare URLs
+]
 
 # Truncated DOI patterns that indicate parsing errors
 TRUNCATED_DOI_PATTERNS = [
@@ -370,9 +449,15 @@ class VerificationEngine:
             if ref.doi:
                 manual_verify_links["doi_resolver"] = f"https://doi.org/{ref.doi}"
             
-            # === STEP 6: Determine final status ===
+            # === STEP 6: Determine final status (ABC-TOM 6-Tier Classification) ===
             
-            # DEFINITE_FAKE: Strong indicators of fabrication
+            # Check source type flags for classification
+            is_grey_lit = self._is_grey_literature(ref)
+            is_book_software = self._is_book_or_software(ref)
+            is_low_quality = self._is_low_quality_source(ref)
+            is_recent = self._is_recent_paper(ref)
+            
+            # Priority 1: DEFINITE_FAKE - Strong indicators of fabrication
             if fake_indicators and not false_positive_warnings:
                 # Future date + not found = definitely fake
                 if any("Future publication" in fi for fi in fake_indicators) and best_confidence < THRESHOLD_SUSPICIOUS:
@@ -386,17 +471,58 @@ class VerificationEngine:
                 else:
                     status = VerificationStatus.SUSPICIOUS
             
-            # LIKELY_VALID: Has false positive warnings and some match
+            # Priority 2: VERIFIED - High confidence exact match
+            elif best_confidence >= THRESHOLD_VERIFIED:
+                # Check for legacy DOI (title matches but DOI broken)
+                if ref.doi and doi_valid is False and pubmed_match:
+                    status = VerificationStatus.VERIFIED_LEGACY_DOI
+                    false_positive_warnings.append(
+                        f"DOI '{ref.doi}' is broken/migrated but paper was verified by title match. "
+                        f"Consider updating to DOI: {pubmed_match.doi}" if pubmed_match.doi else ""
+                    )
+                else:
+                    status = VerificationStatus.VERIFIED
+            
+            # Priority 3: LOW_QUALITY_SOURCE - Real but not peer-reviewed
+            elif is_low_quality and best_confidence >= 0.3:
+                status = VerificationStatus.LOW_QUALITY_SOURCE
+                false_positive_warnings.append(
+                    "This appears to be from a non-peer-reviewed source (preprint, ResearchGate, etc.). "
+                    "The reference exists but may not meet academic peer-review standards."
+                )
+            
+            # Priority 4: GREY_LITERATURE - Valid but not indexed
+            elif (is_grey_lit or is_book_software) and best_confidence < THRESHOLD_VERIFIED:
+                status = VerificationStatus.GREY_LITERATURE
+                if is_grey_lit:
+                    false_positive_warnings.append(
+                        "This is grey literature (government report, guideline, policy document). "
+                        "These are valid sources but not indexed in PubMed/CrossRef."
+                    )
+                else:
+                    false_positive_warnings.append(
+                        "This appears to be a book or software citation. "
+                        "These are valid academic sources but won't be found in journal databases."
+                    )
+            
+            # Priority 5: SUSPICIOUS - Partial match with discrepancies
+            elif best_confidence >= THRESHOLD_SUSPICIOUS:
+                status = VerificationStatus.SUSPICIOUS
+            
+            # Priority 6: LIKELY_VALID - Has false positive warnings
             elif false_positive_warnings and best_confidence >= 0.3:
                 status = VerificationStatus.LIKELY_VALID
             
-            # Standard confidence-based status
-            elif best_confidence >= THRESHOLD_VERIFIED:
-                status = VerificationStatus.VERIFIED
-            elif best_confidence >= THRESHOLD_SUSPICIOUS:
-                status = VerificationStatus.SUSPICIOUS
+            # Priority 7: Recent paper special case (ABC-TOM "Recent Paper Rule")
+            elif is_recent and best_confidence < THRESHOLD_SUSPICIOUS:
+                status = VerificationStatus.LIKELY_VALID
+                false_positive_warnings.append(
+                    f"Paper from {ref.year} is recent (<18 months). 'Not Found' may be due to "
+                    "database indexing lag, not because the paper is fake. Check doi.org directly."
+                )
+            
+            # Priority 8: NOT_FOUND - No match anywhere
             else:
-                # NOT_FOUND but check if we should warn about false positives
                 if false_positive_warnings:
                     status = VerificationStatus.LIKELY_VALID
                 else:
@@ -442,6 +568,89 @@ class VerificationEngine:
                 return True
         
         return False
+    
+    # =========================================================================
+    # ABC-TOM v3.0.0: Source Type Detection Methods
+    # =========================================================================
+    
+    def _is_grey_literature(self, ref: 'ParsedReference') -> bool:
+        """
+        Check if reference is grey literature (valid but not indexed in PubMed).
+        
+        Grey literature includes:
+        - Government reports (WHO, CDC, AHRQ, NHS)
+        - Clinical guidelines (NICE, SIGN, Cochrane)
+        - Reporting standards (PRISMA, CONSORT, STROBE)
+        - Policy documents and white papers
+        """
+        text_to_check = (
+            (ref.raw_text or "") + " " + 
+            (ref.journal or "") + " " + 
+            (ref.title or "")
+        ).lower()
+        
+        for keyword in GREY_LITERATURE_KEYWORDS:
+            if keyword in text_to_check:
+                return True
+        return False
+    
+    def _is_book_or_software(self, ref: 'ParsedReference') -> bool:
+        """
+        Check if reference is a book or software citation.
+        
+        These are valid academic sources but won't be indexed in PubMed.
+        """
+        text_to_check = (
+            (ref.raw_text or "") + " " + 
+            (ref.journal or "") + " " + 
+            (ref.title or "")
+        ).lower()
+        
+        for keyword in BOOK_SOFTWARE_KEYWORDS:
+            if keyword in text_to_check:
+                return True
+        return False
+    
+    def _is_low_quality_source(self, ref: 'ParsedReference') -> bool:
+        """
+        Check if reference is from a low quality (non-peer-reviewed) source.
+        
+        Includes:
+        - Preprint servers (arXiv, bioRxiv, medRxiv)
+        - Academic social networks (ResearchGate, Academia.edu)
+        - Non-academic sources (Wikipedia, blogs)
+        """
+        text_to_check = (
+            (ref.raw_text or "") + " " + 
+            (ref.journal or "") + " " + 
+            (ref.doi or "")
+        ).lower()
+        
+        for keyword in LOW_QUALITY_INDICATORS:
+            if keyword in text_to_check:
+                return True
+        return False
+    
+    def _is_recent_paper(self, ref: 'ParsedReference', months: int = 18) -> bool:
+        """
+        Check if paper is recent (within N months).
+        
+        Recent papers may not be indexed yet - ABC-TOM "Recent Paper Rule":
+        Papers <18 months old returning "Not Found" may be database lag, not fake.
+        """
+        from datetime import datetime
+        
+        if not ref.year:
+            return False
+        
+        current_year = datetime.now().year
+        current_month = datetime.now().month
+        
+        # Calculate age in months (approximate)
+        ref_month = 6  # Assume mid-year if no month
+        age_months = (current_year - ref.year) * 12 + (current_month - ref_month)
+        
+        return age_months <= months
     
     def _is_field_mismatch(self, ref: 'ParsedReference', match: PubMedMatch) -> bool:
         """Check if reference and match are from completely different fields."""
@@ -895,12 +1104,20 @@ class VerificationEngine:
             author_match = self._author_similarity(ref.authors, article.authors)
             scores.append(("author", author_match, 0.25))
         
-        # Year match (15% weight)
+        # Year match (15% weight) - ABC-TOM: +/-1 year tolerance for "Online First" papers
         if ref.year and article.pub_date:
             year_match = re.search(r'\d{4}', article.pub_date)
             if year_match:
                 article_year = int(year_match.group())
-                year_sim = 1.0 if ref.year == article_year else 0.0
+                year_diff = abs(ref.year - article_year)
+                if year_diff == 0:
+                    year_sim = 1.0  # Exact match
+                elif year_diff == 1:
+                    year_sim = 0.9  # +/-1 year tolerance (Online First / publication lag)
+                elif year_diff == 2:
+                    year_sim = 0.5  # Slight penalty for 2-year difference
+                else:
+                    year_sim = 0.0  # Large year difference is suspicious
                 scores.append(("year", year_sim, 0.15))
         
         if not scores:
@@ -1044,3 +1261,101 @@ class VerificationEngine:
         if ref.year:
             parts.append(f"year:{ref.year}")
         return "|".join(parts) if parts else ref.raw_text[:100]
+    
+    # =========================================================================
+    # ABC-TOM v3.0.0: Batch-Level Analysis Methods
+    # =========================================================================
+    
+    def analyze_batch_results(self, results: List[VerificationResult]) -> Dict[str, Any]:
+        """
+        Analyze batch verification results for patterns.
+        
+        ABC-TOM "PDF Layout Pattern":
+        - If 70%+ of references fail, suspect column breaks/hyphenation, not mass hallucination
+        - High failure rate + real author names = likely valid (layout issue)
+        - 0 matches + unknown authors = likely fake
+        
+        Returns:
+            Dict with:
+            - likely_layout_issue: bool
+            - failure_rate: float
+            - recommendation: str
+            - status_breakdown: Dict[str, int]
+        """
+        if not results:
+            return {
+                "likely_layout_issue": False,
+                "failure_rate": 0.0,
+                "recommendation": "No references to analyze.",
+                "status_breakdown": {}
+            }
+        
+        total = len(results)
+        
+        # Count by status
+        status_counts = {}
+        for result in results:
+            status_name = result.status.value
+            status_counts[status_name] = status_counts.get(status_name, 0) + 1
+        
+        # Calculate failure metrics
+        not_found = status_counts.get("NOT_FOUND", 0)
+        suspicious = status_counts.get("SUSPICIOUS", 0)
+        verified = status_counts.get("VERIFIED", 0) + status_counts.get("VERIFIED_LEGACY_DOI", 0)
+        grey_lit = status_counts.get("GREY_LITERATURE", 0)
+        fake = status_counts.get("DEFINITE_FAKE", 0)
+        
+        failure_count = not_found + suspicious
+        failure_rate = failure_count / total if total > 0 else 0.0
+        
+        # Determine if this looks like a layout issue
+        likely_layout_issue = False
+        recommendation = ""
+        
+        if failure_rate >= 0.7 and fake == 0:
+            # 70%+ failures with no definite fakes suggests parsing problem
+            likely_layout_issue = True
+            recommendation = (
+                f"High failure rate ({failure_rate:.0%}) with no definite fakes detected. "
+                f"This pattern suggests PDF parsing issues (column breaks, hyphenation). "
+                f"Consider: (1) Re-extracting text from the PDF, (2) Using a different PDF parser, "
+                f"or (3) Manual verification of flagged references."
+            )
+        elif failure_rate >= 0.5 and grey_lit >= total * 0.3:
+            # Many grey literature sources
+            likely_layout_issue = False
+            recommendation = (
+                f"High 'not found' rate ({failure_rate:.0%}) but {grey_lit}/{total} references "
+                f"are grey literature (government reports, guidelines, etc.). "
+                f"This is expected - these sources are valid but not indexed in PubMed/CrossRef."
+            )
+        elif fake >= total * 0.3:
+            # Many definite fakes - concerning
+            likely_layout_issue = False
+            recommendation = (
+                f"WARNING: {fake}/{total} references ({fake/total:.0%}) are flagged as DEFINITE FAKE. "
+                f"This document may contain AI-hallucinated citations. "
+                f"Manual verification of all references is strongly recommended."
+            )
+        elif verified >= total * 0.8:
+            # Most verified - good
+            recommendation = (
+                f"Strong result: {verified}/{total} references ({verified/total:.0%}) verified. "
+                f"The remaining references may be grey literature or recent papers."
+            )
+        else:
+            recommendation = (
+                f"Mixed results: {verified} verified, {not_found} not found, "
+                f"{suspicious} suspicious, {grey_lit} grey literature. "
+                f"Review individual results for details."
+            )
+        
+        return {
+            "likely_layout_issue": likely_layout_issue,
+            "failure_rate": failure_rate,
+            "recommendation": recommendation,
+            "status_breakdown": status_counts,
+            "total_references": total,
+            "verified_count": verified,
+            "problematic_count": not_found + suspicious + fake
+        }

@@ -6,7 +6,7 @@ Nagomi (和み): calm, balanced clarity in evidence.
 
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
-[![Version](https://img.shields.io/badge/version-2.8.1-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
 
@@ -16,7 +16,7 @@ PubMed Gemini is a Gemini CLI extension that searches PubMed and turns the resul
 - Ask in plain language, it searches 35M+ PubMed studies
 - Get a weighted evidence verdict with trust scores and links
 - Export citations to BibTeX, RIS, or EndNote
-- **NEW:** Detect fake/AI-hallucinated references in PDFs
+- **NEW in v3.0:** ABC-TOM intelligent fake citation detection with 6-tier classification
 
 <details>
 <summary>Brand assets</summary>
@@ -144,7 +144,72 @@ That's it! Gemini will search PubMed and give you an evidence-based answer.
 
 — — —
 
-## New in v2.8 - Enhanced Verification & Actionable Reports
+## New in v3.0 - ABC-TOM Intelligent Reference Verification
+
+### 6-Tier Classification System
+
+The reference verification system now uses intelligent classification to distinguish between genuinely fake citations and valid sources that simply aren't indexed:
+
+| Status | Icon | Meaning |
+|--------|------|---------|
+| `VERIFIED` | OK | Exact match in PubMed/CrossRef |
+| `VERIFIED_LEGACY_DOI` | LEGACY | Paper exists but DOI is broken/migrated |
+| `GREY_LITERATURE` | GREY | Valid source not indexed (WHO, guidelines, reports) |
+| `LOW_QUALITY_SOURCE` | LOW | Real but not peer-reviewed (preprints, ResearchGate) |
+| `SUSPICIOUS` | WARN | Partial match with discrepancies |
+| `NOT_FOUND` | MISS | No match in any database |
+| `DEFINITE_FAKE` | FAKE | Frankenstein citation or impossible data |
+
+### Grey Literature Detection
+
+Automatically recognizes valid non-indexed sources:
+- **Government:** WHO, CDC, NIH, AHRQ, FDA, NHS
+- **Guidelines:** NICE, SIGN, Cochrane, PRISMA, CONSORT
+- **Standards:** STROBE, MOOSE, STARD, TRIPOD
+- **Books & Software:** Textbooks, SPSS, Stata, R citations
+
+### Frankenstein Citation Detection
+
+Catches sophisticated AI hallucinations where real DOIs are attached to fake papers:
+
+```
+FAKE [13] DEFINITE_FAKE
+  "Hao, J. et al. (2025). Biomechanical analysis..."
+  
+  Problem:
+     FRANKENSTEIN CITATION: DOI resolves to different paper.
+     Cited: 'Biomechanical analysis of PAP...'
+     DOI actual: 'Quality improvement in healthcare...'
+  
+  What to do:
+     REMOVE or REPLACE this reference immediately.
+     This is a 'Frankenstein citation' - real DOI attached to wrong paper.
+```
+
+### PDF Layout Issue Detection
+
+When 70%+ of references fail verification:
+- Automatically detects PDF column breaks and hyphenation issues
+- Distinguishes parsing problems from mass hallucination
+- Provides actionable recommendations
+
+### Year Tolerance for Online First
+
+- Accepts +/-1 year difference for recent publications
+- Reduces false positives for "Online First" papers
+- Papers <18 months old get benefit of doubt
+
+### ABC-TOM Framework
+
+The `/ABC-TOM` folder contains the verification philosophy:
+- `A-agents/`: Agent role definitions
+- `C-core/`: Core identity and principles  
+- `M-memory/`: Learning log with known patterns
+- `T-tools/`: Verification protocols
+
+---
+
+## Previous Enhancements (v2.8)
 
 ### Multi-Source DOI Verification
 
