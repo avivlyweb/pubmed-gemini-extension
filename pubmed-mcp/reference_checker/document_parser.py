@@ -83,6 +83,7 @@ class DocumentParser:
         r"^\s*NR\s*$",  # Not reported
         r"^\s*[-–—]+\s*$",  # Just dashes
         r"^\s*[✓✗×•·]+\s*$",  # Checkmarks and bullets
+        r"^\s*\|.*\|\s*$",  # Markdown table rows
     ]
     
     # Minimum characteristics for a valid reference
