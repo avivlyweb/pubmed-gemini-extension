@@ -1,6 +1,6 @@
 {
   "name": "pubmed-gemini-extension",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "PubMed MCP server for Gemini CLI - PhD-level medical research analysis with AI-powered evidence synthesis and ABC-TOM intelligent reference verification",
   "type": "module",
   "main": "pubmed-wrapper.js",
