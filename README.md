@@ -207,6 +207,34 @@ The `/ABC-TOM` folder contains the verification philosophy:
 - `M-memory/`: Learning log with known patterns
 - `T-tools/`: Verification protocols
 
+## Advanced Verification Examples
+
+### 1. Verifying Research Notes (Text/Markdown)
+
+You can verify raw text files containing research notes, even if they aren't formatted as a formal bibliography.
+
+```bash
+/pubmed:verify research_notes.txt
+```
+
+**New in v3.0.1:** The tool now intelligently ignores Markdown tables (e.g., `| P-value | 0.05 |`), preventing false "Grey Literature" flags for data tables.
+
+### 2. Bulk Verification (Entire Folder)
+
+Verify all PDFs in a directory at once to audit a project:
+
+```bash
+/pubmed:verify ./manuscripts/*.pdf
+```
+
+### 3. Quick Forensic Check (Single DOI)
+
+Instantly check if a suspicious DOI is real or a "Frankenstein" hallucination:
+
+```bash
+/pubmed:verify 10.1000/xyz123
+```
+
 ---
 
 ## Previous Enhancements (v2.8)
@@ -685,6 +713,8 @@ Export those top 5 articles to RIS format
 
 | Version | Features |
 |---------|----------|
+| **3.0.1** | **Markdown Table Filtering**: Prevents false positive "Grey Literature" flags in research note files containing data tables. |
+| **3.0.0** | **ABC-TOM System**: 6-Tier Classification, Grey Literature Detection, Advanced Frankenstein Detection, PDF Layout Issue Detection. |
 | **2.8.1** | PDF table filtering, actionable advice in reports, improved terminal/HTML output |
 | **2.8.0** | Multi-source DOI verification (CrossRef, OpenAlex, Europe PMC), Frankenstein detection, 60% title similarity threshold, rapidfuzz integration |
 | **2.7.1** | Tiered confidence (DEFINITE_FAKE, LIKELY_VALID), field detection, APA 7th validation, DOI retry logic, manual verification links |
