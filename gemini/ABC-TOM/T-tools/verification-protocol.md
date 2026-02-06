@@ -31,6 +31,14 @@ When a reference is flagged as **NOT FOUND** or **SUSPICIOUS**:
         - **Yes:** The citation is **VALID** (Parsing error cleared).
         - **No:** The citation is **FAKE** (AI "dreamed" the wrong authors for a real paper).
 
+## 5. Bulk Text Handling Strategy (v3.3)
+- **Symptom:** Input contains multiple references (e.g., 20 lines), but the tool reports `Total References: 1` (The "Blob Failure").
+- **Cause:** Tool failed to recognize newline delimiters, treating the entire block as one long title.
+- **Action:** **Split & Verify**.
+    1.  Manually separate the references into smaller batches (or single items).
+    2.  Run `verify_references` on the cleaned, separated chunks.
+    3.  **Never** accept a "Not Found" verdict if the input text was a massive block.
+
 ## 3. Advanced Detection (v3.0)
 - **"Frankenstein" Reference Check:**
     - Compare DOI metadata vs. Citation Text. Mismatch = **FAKE**.

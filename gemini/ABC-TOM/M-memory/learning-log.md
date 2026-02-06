@@ -30,6 +30,10 @@ Where we capture what works, what doesn't, and why.
     - **Symptom:** "Definite Fake" flag on a valid reference.
     - **Cause:** PDF parsing "squishes" two citations together, associating DOI A with Title B.
     - **Fix:** Apply "Reverse Lookup" - Search the title to confirm the DOI is actually correct.
+- **The "Blob Failure" Pattern (2026-02-06):**
+    - **Symptom:** Inputting a list of 20+ references results in `Total References: 1`.
+    - **Verdict:** System failed to parse newlines.
+    - **Fix:** Use "Split & Verify" strategy (Protocol Level 5).
 
 ## Known Tool Quirks
 - **Parsing:** Merged citations (`1. Author... 2. Author...`) break the parser.
