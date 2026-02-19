@@ -1,14 +1,48 @@
 prompt = """
-Generate a comprehensive research synthesis for this clinical topic.
+Please generate a PhD-level comprehensive research synthesis for this clinical topic.
 
 Topic: {{args}}
 
-Use the generate_research_summary tool to create a PhD-level analysis including:
-- Statistical synthesis (effect sizes, confidence intervals, heterogeneity)
-- Clinical impact analysis (MCID, patient-centered outcomes)
-- Safety profile and adverse events
-- Health equity considerations
-- Research gaps and future directions
+Use the generate_research_summary tool to retrieve raw data, then structure your response EXACTLY as follows:
 
-Focus on methodological rigor, clinical significance, and practical implications for healthcare providers.
+# Evidence Synthesis: {{args}}
+
+## Evidence Summary
+**Verdict:** [Use evidence_compass.verdict] | **Confidence:** [Use evidence_compass.confidence_level]
+[Provide a 2-3 sentence overview of the evidence base, mentioning the total number of studies analyzed and the general consensus.]
+
+## PICO Framework
+- **Population:** [Describe the studied populations from pico_analysis]
+- **Intervention:** [Describe the interventions from pico_analysis]
+- **Comparison:** [Describe the comparisons from pico_analysis]
+- **Outcomes:** [List primary outcomes mentioned in top_articles]
+
+## Statistical Synthesis & Biomarkers
+- **Biomarkers Identified:** [Scan top_articles for 'biomarkers' and list them, e.g., BDNF, CTSB, Cortisol]
+- **Key Findings:** [Synthesize the 'statement' and 'effect_size' from top_articles. Be specific about percentages and p-values.]
+- **Mechanisms:** [Explain how the identified biomarkers link to the observed outcomes based on study snapshots.]
+
+## Study Quality Breakdown
+| Study | Design | Grade | Trust Score | Key Finding |
+| :--- | :--- | :--- | :--- | :--- |
+| [Author/Year] | [Design] | [Grade] | [Score]/100 | [Short summary of finding] |
+*(List the top 5 articles from top_articles)*
+
+## Contradictions & Explanations
+[Use the 'contradiction_analysis' data to explain why some studies might disagree (e.g., population age, dosage, duration).]
+
+## Clinical Impact Analysis
+- **Who benefits most:** [Synthesize from population data and findings]
+- **Optimal parameters:** [Synthesize dosage/duration/frequency if available]
+- **MCID/Significance:** [Mention clinical vs statistical significance]
+
+## Safety & Health Equity
+- **Safety Profile:** [Mention any adverse events or risks identified]
+- **Health Equity:** [Use the 'health_equity' data to discuss accessibility or demographic gaps]
+
+## Knowledge Gaps
+- [List 2-3 gaps identified in the research_gaps data]
+
+---
+*Sources: Provide a list of PMIDs and DOIs from the articles analyzed.*
 """
