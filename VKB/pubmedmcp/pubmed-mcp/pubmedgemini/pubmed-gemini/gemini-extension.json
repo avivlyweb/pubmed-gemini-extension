@@ -1,10 +1,10 @@
 {
-  "name": "pubmed-gemini",
-  "version": "1.0.0",
-  "description": "PubMed MCP server for Gemini CLI - PhD-level medical research analysis",
+  "name": "nagomi-clinical-forensic",
+  "version": "1.1.0",
+  "description": "Nagomi Clinical Forensic - Advanced Evidence-Based Research & Forensic Citation Verification for Gemini CLI",
   "contextFileName": "GEMINI.md",
   "mcpServers": {
-    "pubmed": {
+    "nagomi": {
       "command": "node",
       "args": ["${extensionPath}${/}pubmed-wrapper.js"],
       "cwd": "${extensionPath}"

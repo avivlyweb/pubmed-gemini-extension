@@ -1,7 +1,7 @@
 {
-  "name": "pubmed-gemini-extension",
-  "version": "1.0.0",
-  "description": "PubMed MCP server for Gemini CLI - PhD-level medical research analysis with AI-powered evidence synthesis",
+  "name": "nagomi-clinical-forensic",
+  "version": "1.1.0",
+  "description": "Nagomi Clinical Forensic - Advanced Evidence-Based Research & Forensic Citation Verification",
   "type": "module",
   "main": "pubmed-wrapper.js",
   "scripts": {
@@ -18,15 +18,16 @@
     "zod": "^3.22.4"
   },
   "keywords": [
-    "pubmed",
+    "nagomi",
+    "clinical-forensic",
     "medical-research",
     "evidence-based-medicine",
-    "clinical-research",
+    "citation-verification",
     "ai-synthesis",
     "mcp-server",
     "gemini-cli-extension"
   ],
-  "author": "PubMed Gemini Extension Team",
+  "author": "Nagomi Research Team",
   "license": "MIT",
   "repository": {
     "type": "git",

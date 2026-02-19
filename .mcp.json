@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pubmed": {
+      "command": "/Users/avivly/Downloads/00_Inbox/website/pubmed_extension_repo/pubmed-mcp/venv/bin/python3",
+      "args": [
+        "/Users/avivly/Downloads/00_Inbox/website/pubmed_extension_repo/pubmed-mcp/pubmed_mcp.py"
+      ],
+      "cwd": "/Users/avivly/Downloads/00_Inbox/website/pubmed_extension_repo/pubmed-mcp"
+    }
+  }
+}

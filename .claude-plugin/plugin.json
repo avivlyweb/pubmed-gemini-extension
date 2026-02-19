@@ -1,0 +1,18 @@
+{
+  "name": "pubmed-research",
+  "description": "PhD-level PubMed medical research analysis. Search 35M+ studies, get evidence-weighted verdicts, verify citations, and synthesize findings from peer-reviewed literature.",
+  "version": "3.0.0",
+  "author": {
+    "name": "Aviv",
+    "email": "aviv@physiotherapy.ai"
+  },
+  "mcpServers": {
+    "pubmed": {
+      "command": "/Users/avivly/Downloads/00_Inbox/website/pubmed_extension_repo/pubmed-mcp/venv/bin/python3",
+      "args": [
+        "/Users/avivly/Downloads/00_Inbox/website/pubmed_extension_repo/pubmed-mcp/pubmed_mcp.py"
+      ],
+      "cwd": "/Users/avivly/Downloads/00_Inbox/website/pubmed_extension_repo/pubmed-mcp"
+    }
+  }
+}

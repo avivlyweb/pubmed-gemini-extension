@@ -15,8 +15,8 @@ const __dirname = dirname(__filename);
 // Path to the Python MCP server (go up to project root, then into pubmed-mcp directory)
 const pythonServerPath = join(__dirname, '..', '..', '..', 'pubmed-mcp', 'pubmed_mcp.py');
 
-console.error('Starting PubMed MCP Server...');
-console.error(`Python server path: ${pythonServerPath}`);
+console.error('Starting Nagomi Forensic Engine...');
+console.error(`Backend engine path: ${pythonServerPath}`);
 
 // Spawn the Python process
 const pythonProcess = spawn('python3', [pythonServerPath], {
@@ -35,12 +35,12 @@ pythonProcess.stderr.pipe(process.stderr);
 
 // Handle process termination
 pythonProcess.on('exit', (code) => {
-  console.error(`PubMed MCP server exited with code ${code}`);
+  console.error(`Nagomi Forensic Engine exited with code ${code}`);
   process.exit(code);
 });
 
 pythonProcess.on('error', (err) => {
-  console.error(`Failed to start PubMed MCP server: ${err.message}`);
+  console.error(`Failed to start Nagomi Forensic Engine: ${err.message}`);
   process.exit(1);
 });
 

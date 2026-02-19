@@ -1,7 +1,7 @@
 #!/bin/bash
-# PubMed Gemini Extension Installation Script
+# Nagomi Clinical Forensic Installation Script
 
-echo "🧬 PubMed Gemini Extension Installer"
+echo "🏯 Nagomi Clinical Forensic Installer"
 echo "===================================="
 echo ""
 
@@ -16,7 +16,7 @@ echo "📍 Current directory: $(pwd)"
 echo "📄 Extension config found: $(cat gemini-extension.json | grep '"name"' | cut -d'"' -f4)"
 echo ""
 
-echo "🔗 Linking extension to Gemini CLI..."
+echo "🔗 Linking Nagomi Forensic Engine to Gemini CLI..."
 echo "This will ask for confirmation. Type 'Y' and press Enter."
 echo ""
 
@@ -29,19 +29,20 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "🚀 Next steps:"
     echo "1. Restart your Gemini CLI (close and reopen)"
-    echo "2. Try: /pubmed:search does exercise help back pain"
-    echo "3. Try: /pubmed:synthesis telemedicine for diabetes"
-    echo "4. Try: /pubmed:analyze 34580864"
+    echo "2. Try: /nagomi:synthesis the effects of running outside on brain function"
+    echo "3. Try: /nagomi:verify 10.1001/jama.2023.12345"
+    echo "4. Try: /nagomi:analyze 34580864"
     echo ""
     echo "📚 Available commands:"
-    echo "• /pubmed:search <query>     - Enhanced PubMed search"
-    echo "• /pubmed:synthesis <topic>  - PhD-level research synthesis"
-    echo "• /pubmed:analyze <pmid>     - Article quality assessment"
+    echo "• /nagomi:synthesis <topic>  - PhD-level evidence synthesis"
+    echo "• /nagomi:verify <identifier> - Forensic citation audit"
+    echo "• /nagomi:analyze <pmid>     - Methodological appraisal"
+    echo "• /nagomi:export <pmid>      - Bibliographic export"
     echo ""
     echo "🧪 Test the installation:"
-    echo "gemini extensions list | grep pubmed"
+    echo "gemini extensions list | grep nagomi"
     echo ""
-    echo "🎉 Happy researching with AI-powered PubMed analysis!"
+    echo "🎉 Engineered with precision for the global scientific vanguard!"
 else
     echo ""
     echo "❌ Extension linking failed. Please check the error messages above."
