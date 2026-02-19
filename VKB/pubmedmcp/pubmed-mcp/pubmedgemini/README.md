@@ -2,10 +2,6 @@
 
 **Advanced Evidence-Based Research & Forensic Citation Verification for Gemini CLI** 🔬🧠📜
 
-![Nagomi — Surgical precision in evidence](docs/images/sakura-banner.svg)
-
-Nagomi (和み): calm, balanced clarity in evidence.
-
 [![Gemini CLI Extension](https://img.shields.io/badge/Gemini_CLI-Extension-blue)](https://gcli.dev)
 [![Clinical Evidence](https://img.shields.io/badge/Clinical-Evidence-red)](https://pubmed.ncbi.nlm.nih.gov)
 [![Forensic Audit](https://img.shields.io/badge/Forensic-Audit-purple)](https://pubmed.ncbi.nlm.nih.gov)

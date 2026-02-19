@@ -1,0 +1,19 @@
+# PubMed MCP Server Dependencies
+# Works with Python 3.9+
+
+# Core dependency (required)
+httpx>=0.25.0
+
+# Reference Checker dependencies (v2.7.0)
+# PDF extraction
+PyMuPDF>=1.23.0
+
+# Word document parsing
+python-docx>=1.1.0
+
+# Fuzzy string matching for title similarity (v2.8.0)
+# Optional but recommended - falls back to token overlap if not installed
+rapidfuzz>=3.0.0
+
+# HTML to PDF conversion (optional - for PDF report generation)
+# weasyprint>=60.0  # Uncomment if PDF reports needed (has system dependencies)

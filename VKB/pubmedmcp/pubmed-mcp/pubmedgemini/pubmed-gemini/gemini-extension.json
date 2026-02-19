@@ -1,0 +1,13 @@
+{
+  "name": "nagomi-clinical-forensic",
+  "version": "1.1.0",
+  "description": "Nagomi Clinical Forensic - Advanced Evidence-Based Research & Forensic Citation Verification for Gemini CLI",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "nagomi": {
+      "command": "node",
+      "args": ["${extensionPath}${/}pubmed-wrapper.js"],
+      "cwd": "${extensionPath}"
+    }
+  }
+}
