@@ -1,29 +1,38 @@
-# PubMed Research Plugin for Claude Code
+# 🏯 Nagomi Clinical Forensic
 
-PhD-level medical research analysis powered by PubMed's 35M+ article database.
+**Forensic-Grade Evidence-Based Research & Citation Verification Engine** 🔬🧠📜
 
-## Skills
+Nagomi Clinical Forensic is a sophisticated research instrument that transforms your CLI into a high-fidelity clinical analysis platform. It moves beyond simple literature search to provide rigorous methodological appraisals, identifying "Frankenstein Citations" and synthesizing PhD-level evidence with surgical precision.
 
-| Skill | Invoke | Description |
-|-------|--------|-------------|
-| `pubmed-search` | `/pubmed-search does yoga help anxiety` | Evidence-weighted search with trust scores |
-| `pubmed-analyze` | `/pubmed-analyze 34580864` | Deep analysis of a specific article by PMID |
-| `pubmed-synthesis` | `/pubmed-synthesis exercise for COPD` | Systematic multi-study evidence synthesis |
-| `pubmed-verify` | `/pubmed-verify Smith 2021 ...` | Citation fraud detection (ABC-TOM 6-tier) |
+---
 
-## MCP Server
+## 🏛️ Core Epistemic Skills
 
-The plugin connects to the PubMed MCP server at:
-`/Users/avivly/Downloads/00_Inbox/website/pubmed_extension_repo/pubmed-mcp/pubmed_mcp.py`
+| Skill | Command | Description |
+|-------|---------|-------------|
+| **Evidence Synthesis** | `/nagomi:synthesis` | Systematic multi-study synthesis with biomarker correlation. |
+| **Forensic Verification** | `/nagomi:verify` | Forensic audit for hallucinated citations (ABC-TOM v3.0). |
+| **Methodological Appraisal** | `/nagomi:analyze` | Critical deconstruction of specific literature by PMID. |
+| **Authoritative Search** | `/nagomi:search` | Evidence-weighted search with Nagomi Trust Quotients. |
+| **Bibliographic Export** | `/nagomi:export` | Export literature to BibTeX, RIS, or EndNote schemata. |
 
-The Node.js wrapper (`pubmed-wrapper.js`) auto-creates a Python venv on first run.
+---
 
-## Setup
+## 🧬 Architecture
 
-The `.mcp.json` in this directory wires up the MCP server automatically when Claude Code
-is run from this directory.
+The system utilizes a multi-layered architecture for maximum veridicality:
+1.  **Nagomi Forensic Engine (v3.0)**: A Python-based backend that performs real-time author/metadata cross-validation against PubMed, CrossRef, and OpenAlex registries.
+2.  **Node.js Wrapper**: Provides seamless MCP integration for model-tool communication.
+3.  **PhD-Level Orchestration**: Advanced command templates optimized for clinical translational utility.
 
-## Source
+---
 
-Based on the [PubMed Gemini Extension](https://github.com/avivlyweb/pubmed-gemini-extension)
-by Aviv at [physiotherapy.ai](https://physiotherapy.ai).
+## 📦 Deployment
+
+The plugin connects to the Nagomi MCP server. The Node.js wrapper (`pubmed-wrapper.js`) automatically manages the Python environment and dependency synchronization on execution.
+
+## 🤝 Source & Integrity
+
+Engineered by Aviv at [physiotherapy.ai](https://physiotherapy.ai). This project is designed for scholarly exploration and does not constitute medical advice.
+
+*Precision. Rigor. Veridicality.* 🏯
