@@ -1,5 +1,5 @@
 #
-# PubMed Gemini Extension - One-Click Installer for Windows
+# Nagomi Clinical Forensic - One-Click Installer for Windows
 # 
 # Usage (copy & paste this ONE line in PowerShell):
 #   irm https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/install.ps1 | iex
@@ -22,7 +22,7 @@ function Write-Banner {
     Write-Host ""
     Write-Color "================================================================" Magenta
     Write-Color "                                                              " Magenta
-    Write-Color "   PubMed Gemini Extension                                    " Cyan
+    Write-Color "   Nagomi Clinical Forensic                                    " Cyan
     Write-Color "   Medical Research AI for Gemini CLI                         " Cyan
     Write-Color "                                                              " Magenta
     Write-Color "================================================================" Magenta
@@ -268,9 +268,9 @@ function Show-Success {
     Write-Host ""
     Write-Host "  2. Try these commands:"
     Write-Host ""
-    Write-Color "     /pubmed:search does yoga help anxiety" Blue
-    Write-Color "     /pubmed:analyze 34580864" Blue
-    Write-Color "     /pubmed:synthesis telemedicine for diabetes" Blue
+    Write-Color "     /nagomi:search does yoga help anxiety" Blue
+    Write-Color "     /nagomi:analyze 34580864" Blue
+    Write-Color "     /nagomi:synthesis telemedicine for diabetes" Blue
     Write-Host ""
     Write-Color "----------------------------------------------------------------" Cyan
     Write-Host "  Installation: $InstallDir"
@@ -297,7 +297,7 @@ function Main {
     Write-Step "Step 4/5: Python"
     $pythonCmd = Install-Python
     
-    Write-Step "Step 5/5: PubMed Extension"
+    Write-Step "Step 5/5: Nagomi engine"
     Setup-Repository
     Install-NodeDeps
     Install-PythonDeps -PythonCmd $pythonCmd

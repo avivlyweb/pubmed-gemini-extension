@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * PubMed MCP Server Wrapper for Gemini CLI
+ * Nagomi forensic server Wrapper for Gemini CLI
  * Spawns the Python MCP server as a child process
  * 
  * v2.7.0: Install all dependencies from requirements.txt (PyMuPDF, python-docx)
@@ -40,7 +40,7 @@ async function ensureVenvExists() {
 
   // First run - need to create venv
   console.error('');
-  console.error('  PubMed Extension - First run setup (30 seconds)');
+  console.error('  Nagomi engine - First run setup (30 seconds)');
   console.error('  Made by Aviv at Avivly (physiotherapy.ai)');
   console.error('');
   console.error('  Setting up Python environment...');
@@ -114,7 +114,7 @@ async function ensureVenvExists() {
   // Ensure venv exists (creates on first run)
   const pythonCmd = await ensureVenvExists();
 
-  console.error('Starting PubMed MCP Server...');
+  console.error('Starting Nagomi forensic server...');
 
   // Spawn the Python process
   const pythonProcess = spawn(pythonCmd, [pythonServerPath], {
@@ -137,7 +137,7 @@ async function ensureVenvExists() {
   });
 
   pythonProcess.on('error', (err) => {
-    console.error(`Failed to start PubMed MCP server: ${err.message}`);
+    console.error(`Failed to start Nagomi forensic server: ${err.message}`);
     process.exit(1);
   });
 

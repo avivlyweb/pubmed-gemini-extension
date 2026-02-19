@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * PubMed MCP Server Wrapper for Gemini CLI
+ * Nagomi forensic server Wrapper for Gemini CLI
  * Spawns the Python MCP server as a child process
  */
 
@@ -46,13 +46,13 @@ pythonProcess.on('error', (err) => {
 
 // Handle parent process termination
 process.on('SIGINT', () => {
-  console.error('Terminating PubMed MCP server...');
+  console.error('Terminating Nagomi forensic server...');
   pythonProcess.kill('SIGINT');
 });
 
 process.on('SIGTERM', () => {
-  console.error('Terminating PubMed MCP server...');
+  console.error('Terminating Nagomi forensic server...');
   pythonProcess.kill('SIGTERM');
 });
 
-console.error('PubMed MCP Server wrapper started successfully');
+console.error('Nagomi forensic server wrapper started successfully');

@@ -1,7 +1,7 @@
 #!/bin/bash
-# PubMed Gemini Extension Verification Script
+# Nagomi Clinical Forensic Verification Script
 
-echo "🔍 PubMed Gemini Extension Verification"
+echo "🔍 Nagomi Clinical Forensic Verification"
 echo "======================================"
 echo ""
 
@@ -47,9 +47,9 @@ echo ""
 echo "🎯 TEST YOUR INSTALLATION:"
 echo "1. Open a NEW terminal window"
 echo "2. Start Gemini CLI: gemini"
-echo "3. Try: /pubmed:search does exercise help back pain"
-echo "4. Try: /pubmed:synthesis acupuncture for migraines"
-echo "5. Try: /pubmed:analyze 34580864"
+echo "3. Try: /nagomi:search does exercise help back pain"
+echo "4. Try: /nagomi:synthesis acupuncture for migraines"
+echo "5. Try: /nagomi:analyze 34580864"
 
 echo ""
 echo "📊 If you see PubMed analysis results, the installation is successful! 🎉"

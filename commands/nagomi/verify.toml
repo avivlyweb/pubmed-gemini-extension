@@ -63,10 +63,10 @@ Use the verify_references tool to analyze the provided document, references, or 
 - If a DOI, PMID, or URL is provided, use `identifier` parameter for quick lookup
 
 **Examples:**
-- `/pubmed:verify ~/Documents/thesis.pdf` - Check all references in a PDF
-- `/pubmed:verify 10.1001/jama.2023.12345` - Verify a DOI
-- `/pubmed:verify 12345678` - Look up a PMID
-- `/pubmed:verify https://doi.org/10.1234/abc` - Verify DOI from URL
+- `/nagomi:verify ~/Documents/thesis.pdf` - Check all references in a PDF
+- `/nagomi:verify 10.1001/jama.2023.12345` - Verify a DOI
+- `/nagomi:verify 12345678` - Look up a PMID
+- `/nagomi:verify https://doi.org/10.1234/abc` - Verify DOI from URL
 
 **After verification, provide:**
 

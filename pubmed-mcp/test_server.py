@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick test script for the PubMed MCP server
+Quick test script for the Nagomi forensic server
 """
 
 import asyncio
@@ -10,7 +10,7 @@ sys.path.insert(0, '.')
 from pubmed_mcp import PubMedClient, PICOExtractor, TrustAnalyzer, ResearchSynthesizer
 
 async def test_search():
-    print("Testing PubMed MCP Server Components...")
+    print("Testing Nagomi forensic server Components...")
     print("=" * 50)
     
     client = PubMedClient()

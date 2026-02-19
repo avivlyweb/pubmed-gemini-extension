@@ -1,7 +1,7 @@
 #!/bin/bash
-# Test script for PubMed Gemini Extension
+# Test script for Nagomi Clinical Forensic
 
-echo "🧪 Testing PubMed Gemini Extension"
+echo "🧪 Testing Nagomi Clinical Forensic"
 echo "=================================="
 
 # Test 1: Check if extension is installed
@@ -10,28 +10,28 @@ gemini extensions list | grep pubmed-gemini && echo "✅ Extension installed" ||
 
 # Test 2: Test the search command
 echo ""
-echo "2. Testing /pubmed:search command..."
-echo "Command: /pubmed:search does exercise help chronic back pain"
+echo "2. Testing /nagomi:search command..."
+echo "Command: /nagomi:search does exercise help chronic back pain"
 echo "Note: This would normally run the command, but requires interactive Gemini CLI session"
 
 # Test 3: Test the synthesis command
 echo ""
-echo "3. Testing /pubmed:synthesis command..."
-echo "Command: /pubmed:synthesis telemedicine for diabetes"
+echo "3. Testing /nagomi:synthesis command..."
+echo "Command: /nagomi:synthesis telemedicine for diabetes"
 echo "Note: This would normally run the command, but requires interactive Gemini CLI session"
 
 # Test 4: Test the analyze command
 echo ""
-echo "4. Testing /pubmed:analyze command..."
-echo "Command: /pubmed:analyze 34580864"
+echo "4. Testing /nagomi:analyze command..."
+echo "Command: /nagomi:analyze 34580864"
 echo "Note: This would normally run the command, but requires interactive Gemini CLI session"
 
 echo ""
 echo "🎯 To test the extension:"
 echo "1. Open Gemini CLI in a new terminal"
-echo "2. Try: /pubmed:search does exercise help chronic back pain"
-echo "3. Try: /pubmed:synthesis acupuncture for migraines"
-echo "4. Try: /pubmed:analyze 34580864"
+echo "2. Try: /nagomi:search does exercise help chronic back pain"
+echo "3. Try: /nagomi:synthesis acupuncture for migraines"
+echo "4. Try: /nagomi:analyze 34580864"
 
 echo ""
 echo "📚 Available tools in Gemini CLI:"

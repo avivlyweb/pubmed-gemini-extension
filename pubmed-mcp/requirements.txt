@@ -1,4 +1,4 @@
-# PubMed MCP Server Dependencies
+# Nagomi forensic server Dependencies
 # Works with Python 3.9+
 
 # Core dependency (required)

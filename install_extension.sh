@@ -1,10 +1,10 @@
 #!/bin/bash
-# PubMed Gemini Extension - Local Installation Script
+# Nagomi Clinical Forensic - Local Installation Script
 # Run this after cloning the repository manually
 
 set -e
 
-echo "PubMed Gemini Extension - Local Installer"
+echo "Nagomi Clinical Forensic - Local Installer"
 echo "=========================================="
 echo ""
 
@@ -59,14 +59,14 @@ if gemini extensions list 2>/dev/null | grep -q "pubmed-gemini"; then
     echo ""
     echo "Next steps:"
     echo "  1. Restart your Gemini CLI (close and reopen)"
-    echo "  2. Try: /pubmed:search does exercise help back pain"
-    echo "  3. Try: /pubmed:synthesis telemedicine for diabetes"
-    echo "  4. Try: /pubmed:analyze 34580864"
+    echo "  2. Try: /nagomi:search does exercise help back pain"
+    echo "  3. Try: /nagomi:synthesis telemedicine for diabetes"
+    echo "  4. Try: /nagomi:analyze 34580864"
     echo ""
     echo "Available commands:"
-    echo "  /pubmed:search <query>     - Enhanced PubMed search"
-    echo "  /pubmed:synthesis <topic>  - PhD-level research synthesis"
-    echo "  /pubmed:analyze <pmid>     - Article quality assessment"
+    echo "  /nagomi:search <query>     - Enhanced PubMed search"
+    echo "  /nagomi:synthesis <topic>  - PhD-level research synthesis"
+    echo "  /nagomi:analyze <pmid>     - Article quality assessment"
     echo ""
 else
     echo ""

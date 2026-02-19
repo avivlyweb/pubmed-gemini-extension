@@ -1,6 +1,6 @@
-# 🤝 Contributing to PubMed Gemini Extension
+# 🤝 Contributing to Nagomi Clinical Forensic
 
-**Welcome!** We're thrilled you're interested in contributing to the PubMed Gemini Extension. This project aims to democratize access to medical research through AI-powered analysis.
+**Welcome!** We're thrilled you're interested in contributing to the Nagomi Clinical Forensic. This project aims to democratize access to medical research through AI-powered analysis.
 
 ## 📋 Table of Contents
 
@@ -68,7 +68,7 @@ gemini extensions link pubmed-gemini/
 
 # Test in Gemini CLI
 gemini
-/pubmed:search "test query"
+/nagomi:search "test query"
 ```
 
 ## 💡 How to Contribute
@@ -166,9 +166,9 @@ gemini extensions link pubmed-gemini/
 
 # Test in Gemini CLI
 gemini
-/pubmed:search "exercise for back pain"
-/pubmed:analyze "34580864"
-/pubmed:synthesis "telemedicine"
+/nagomi:search "exercise for back pain"
+/nagomi:analyze "34580864"
+/nagomi:synthesis "telemedicine"
 ```
 
 #### Automated Testing

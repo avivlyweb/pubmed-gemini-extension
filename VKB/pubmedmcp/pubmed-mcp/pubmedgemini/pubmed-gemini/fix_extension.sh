@@ -1,7 +1,7 @@
 #!/bin/bash
-# Fix PubMed Gemini Extension Script
+# Fix Nagomi Clinical Forensic Script
 
-echo "🔧 Fixing PubMed Gemini Extension..."
+echo "🔧 Fixing Nagomi Clinical Forensic..."
 echo "===================================="
 
 # Check if we're in the right directory
@@ -49,13 +49,13 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "🧪 TEST IT NOW:"
     echo "1. Open a NEW Gemini CLI terminal: gemini"
-    echo "2. Try: /pubmed:search does exercise help back pain"
+    echo "2. Try: /nagomi:search does exercise help back pain"
     echo "3. You should see PICO analysis and trust scores (not Google Search fallback)"
     echo ""
     echo "📚 Available commands:"
-    echo "• /pubmed:search <query> - Enhanced PubMed search"
-    echo "• /pubmed:synthesis <topic> - PhD-level synthesis"
-    echo "• /pubmed:analyze <pmid> - Article quality assessment"
+    echo "• /nagomi:search <query> - Enhanced PubMed search"
+    echo "• /nagomi:synthesis <topic> - PhD-level synthesis"
+    echo "• /nagomi:analyze <pmid> - Article quality assessment"
 else
     echo ""
     echo "❌ Verification failed - extension may not be properly linked"
