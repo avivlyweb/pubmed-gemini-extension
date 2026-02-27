@@ -1,6 +1,0 @@
-description = "Search PubMed for clinical evidence"
-prompt = """
-I need to find clinical evidence on the following topic: {{args}}
-
-Please use the `clinical_search` tool to find high-quality papers.
-"""

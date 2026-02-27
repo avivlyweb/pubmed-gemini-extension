@@ -4146,7 +4146,7 @@ class MCPServer:
                     },
                     "serverInfo": {
                         "name": "pubmed-research-mcp",
-                        "version": "2.7.0"
+                        "version": "3.0.1"
                     }
                 }
             elif method == "notifications/initialized":

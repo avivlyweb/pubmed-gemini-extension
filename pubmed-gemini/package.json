@@ -1,6 +1,6 @@
 {
   "name": "pubmed-gemini-extension",
-  "version": "2.7.0",
+  "version": "3.0.1",
   "description": "Nagomi forensic server for Gemini CLI - PhD-level medical research analysis with AI-powered evidence synthesis and reference verification",
   "type": "module",
   "main": "pubmed-wrapper.js",
@@ -13,10 +13,7 @@
     "typescript": "~5.4.5",
     "@types/node": "^20.11.25"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.0",
-    "zod": "^3.22.4"
-  },
+  "dependencies": {},
   "keywords": [
     "pubmed",
     "medical-research",
