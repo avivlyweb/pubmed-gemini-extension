@@ -184,5 +184,9 @@ MIT
 > Nagomi Clinical Forensic is a research tool for scholarly exploration. It does not constitute medical advice. Clinical decisions should always be mediated by qualified practitioners.
 
 <div align="center">
-<sub>和み — engineered with precision for the scientific community</sub>
+
+<img src="https://physiotherapy.ai/wp-content/uploads/2025/08/Logo-icon-pt-charlie.png" width="32" alt="PT Charlie"/>
+
+<sub>Made with love by Aviv at <a href="https://physiotherapy.ai">avivly</a></sub>
+
 </div>
