@@ -1,7 +1,7 @@
 {
   "name": "pubmed-gemini",
-  "version": "3.0.1",
-  "description": "Nagomi forensic server for Gemini CLI - PhD-level medical research analysis with reference verification",
+  "version": "3.1.0",
+  "description": "Nagomi Clinical Forensic: PhD-level medical research engine with automated hallucination detection, volume paradox logic, and evidence grading.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {
     "pubmed": {
