@@ -48,6 +48,8 @@ class FakeIndicator(str, Enum):
     FUTURE_DATE = "FUTURE_DATE"                   # Publication date is in the future
     TRUNCATED_DOI = "TRUNCATED_DOI"               # DOI is malformed/truncated
     DOI_DIFFERENT_PAPER = "DOI_DIFFERENT_PAPER"   # DOI resolves to different paper entirely
+    IMPOSSIBLE_VOLUME = "IMPOSSIBLE_VOLUME"       # Volume number is impossible for the year
+    SEQUENTIAL_ID_MISMATCH = "SEQUENTIAL_ID_MISMATCH" # ID (e.g. Cureus e-ID) doesn't match year
 
 
 @dataclass
@@ -228,6 +230,18 @@ class VerificationEngine:
     OPENALEX_API = "https://api.openalex.org/works"
     EUROPE_PMC_API = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     
+    # Heuristics for common journals to detect AI hallucinations (Volume/Year paradox)
+    # Mapping: { "canonical journal name substring": { "start_year": YYYY, "volumes_per_year": V } }
+    JOURNAL_METADATA_HEURISTICS = {
+        "computational and structural biotechnology": {"start_year": 2012, "vpy": 1}, # CSBJ Vol 1 in 2012
+        "bmc medical education": {"start_year": 2001, "vpy": 1},
+        "nature": {"start_year": 1869, "vpy": 2}, # High volume journals often have 2+ per year
+        "cureus": {"start_year": 2009, "vpy": 1},
+        "journal of medical internet research": {"start_year": 1999, "vpy": 1},
+        "lancet": {"start_year": 1823, "vpy": 2},
+        "plos one": {"start_year": 2006, "vpy": 1},
+    }
+
     def __init__(self, pubmed_client=None, email: Optional[str] = None):
         """
         Initialize verification engine.
@@ -270,6 +284,56 @@ class VerificationEngine:
         if self._http_client:
             await self._http_client.aclose()
     
+    def _check_volume_plausibility(self, ref: 'ParsedReference') -> Optional[str]:
+        """
+        Check if cited volume matches the publication year using heuristics.
+        Returns a warning message if implausible.
+        """
+        if not ref.journal or not ref.year or not ref.volume:
+            return None
+            
+        journal_lower = ref.journal.lower()
+        try:
+            cited_vol = int(re.sub(r'\D', '', str(ref.volume)))
+        except ValueError:
+            return None
+
+        for j_key, h in self.JOURNAL_METADATA_HEURISTICS.items():
+            if j_key in journal_lower:
+                # Expected volume range: (Year - StartYear) * VPY +/- 2
+                expected_base = (ref.year - h["start_year"]) * h["vpy"]
+                if expected_base < 0: return f"Journal '{ref.journal}' started in {h['start_year']}; year {ref.year} is impossible."
+                
+                min_vol = max(1, expected_base - 2)
+                max_vol = expected_base + 5 # Give some buffer for rapid growth or supplements
+                
+                if cited_vol > max_vol + 3 or cited_vol < min_vol - 2:
+                    return f"VOLUME PARADOX: '{ref.journal}' in {ref.year} should be Vol ~{expected_base}, but Vol {cited_vol} was cited."
+        
+        return None
+
+    def _check_sequential_id_plausibility(self, ref: 'ParsedReference') -> Optional[str]:
+        """
+        Check for sequential ID mismatches (e.g. Cureus e-ID stolen from old paper).
+        """
+        if not ref.doi or not ref.year:
+            return None
+            
+        # Cureus Pattern: 10.7759/cureus.XXXXX
+        cureus_match = re.search(r'cureus\.(\d+)', ref.doi.lower())
+        if cureus_match:
+            article_id = int(cureus_match.group(1))
+            # Heuristic: 
+            # < 10000 -> 2018 or earlier
+            # 10000-20000 -> 2019-2020
+            # 50000+ -> 2024+
+            if ref.year >= 2024 and article_id < 20000:
+                return f"SEQUENTIAL ID MISMATCH: Cureus ID '{article_id}' belongs to 2020 or earlier, but was cited for {ref.year}."
+            if ref.year <= 2020 and article_id > 40000:
+                return f"SEQUENTIAL ID MISMATCH: Cureus ID '{article_id}' is too high for year {ref.year}."
+
+        return None
+
     async def verify(self, ref: 'ParsedReference') -> VerificationResult:
         """
         Verify a single reference with tiered confidence system.
@@ -316,6 +380,16 @@ class VerificationEngine:
             # Check for future publication dates (impossible)
             if ref.year and ref.year > current_year:
                 fake_indicators.append(f"Future publication date: {ref.year} (currently {current_year})")
+
+            # NEW: Check for Volume/Year paradox
+            vol_warning = self._check_volume_plausibility(ref)
+            if vol_warning:
+                fake_indicators.append(vol_warning)
+            
+            # NEW: Check for Sequential ID mismatch (stolen IDs)
+            id_warning = self._check_sequential_id_plausibility(ref)
+            if id_warning:
+                fake_indicators.append(id_warning)
             
             # === STEP 1: Check DOI if present (with multi-source fallback) ===
             doi_metadata = None
@@ -467,6 +541,9 @@ class VerificationEngine:
                     status = VerificationStatus.DEFINITE_FAKE
                 # Frankenstein citation = definitely fake
                 elif any("FRANKENSTEIN" in fi for fi in fake_indicators):
+                    status = VerificationStatus.DEFINITE_FAKE
+                # NEW: Volume Paradox or ID Mismatch = definitely fake
+                elif any("VOLUME PARADOX" in fi for fi in fake_indicators) or any("SEQUENTIAL ID" in fi for fi in fake_indicators):
                     status = VerificationStatus.DEFINITE_FAKE
                 else:
                     status = VerificationStatus.SUSPICIOUS

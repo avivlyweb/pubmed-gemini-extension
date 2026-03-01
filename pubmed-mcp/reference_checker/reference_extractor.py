@@ -102,7 +102,8 @@ class ReferenceExtractor:
     # Volume, issue, pages pattern: 15(3), 123-145 or Vol. 15, No. 3, pp. 123-145
     VOLUME_ISSUE_PAGES = re.compile(
         r'(\d+)\s*\((\d+(?:-\d+)?)\)\s*[,:]?\s*(\d+(?:[-–]\d+)?)|'  # 15(3), 123-145
-        r'[Vv]ol\.?\s*(\d+).*?[Nn]o\.?\s*(\d+).*?[Pp]p\.?\s*(\d+(?:[-–]\d+)?)',
+        r'[Vv]ol\.?\s*(\d+).*?[Nn]o\.?\s*(\d+).*?[Pp]p\.?\s*(\d+(?:[-–]\d+)?)|' # Vol 15, No 3, pp 123
+        r'(\d+),\s*(\d+(?:[-–]\d+)?)\b', # 27, 2481-2491 (Simple Volume, Pages)
         re.IGNORECASE
     )
     
@@ -396,17 +397,26 @@ class ReferenceExtractor:
                 volume = groups[3]
                 issue = groups[4]
                 pages = groups[5]
+            elif groups[6]:  # Simple Vol, Pages format: 27, 2481-2491
+                volume = groups[6]
+                pages = groups[7]
             
             # Journal name is usually before the volume/issue pattern
             # And after the title (which ends with a period)
-            pre_volume = text[:vol_match.start()]
+            pre_volume = text[:vol_match.start()].strip()
+            # Remove trailing comma or period from pre_volume
+            pre_volume = re.sub(r'[\.,]\s*$', '', pre_volume)
+            
             # Find the last sentence before volume info
-            sentences = pre_volume.split('.')
-            if len(sentences) >= 2:
-                potential_journal = sentences[-2].strip()
+            # Journals are often preceded by a period from the title or a comma
+            parts = re.split(r'[\.,]\s*', pre_volume)
+            if parts:
+                potential_journal = parts[-1].strip()
                 # Journal names are usually Title Case
-                if potential_journal and re.match(r'^[A-Z][a-zA-Z\s&]+$', potential_journal):
+                if potential_journal and len(potential_journal) > 3:
                     journal = potential_journal
+            # DEBUG
+            # print(f"DEBUG: pre_volume='{pre_volume}', journal='{journal}'")
         
         # Alternative: look for italic markers or known journal patterns
         if not journal:

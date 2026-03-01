@@ -6,7 +6,7 @@ Nagomi (和み): calm, balanced clarity in evidence.
 
 > **Your AI Research Assistant for 35+ Million Medical Studies**
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![PubMed](https://img.shields.io/badge/PubMed-35M%2B%20articles-orange.svg)](https://pubmed.ncbi.nlm.nih.gov/)
 
@@ -16,7 +16,7 @@ PubMed Gemini is a Gemini CLI extension that searches PubMed and turns the resul
 - Ask in plain language, it searches 35M+ PubMed studies
 - Get a weighted evidence verdict with trust scores and links
 - Export citations to BibTeX, RIS, or EndNote
-- **NEW in v3.0:** ABC-TOM intelligent fake citation detection with 6-tier classification
+- **NEW in v3.1:** Advanced Hallucination Hunting (Volume Paradox & Sequential ID detection)
 
 <details>
 <summary>Brand assets</summary>
@@ -144,7 +144,15 @@ That's it! Gemini will search PubMed and give you an evidence-based answer.
 
 — — —
 
-## New in v3.0 - ABC-TOM Intelligent Reference Verification
+### New in v3.1 - Advanced Hallucination Hunting
+
+The reference verification system now includes "Scientific Logic" checks to catch high-quality AI fabrications:
+
+| Detector | Purpose | Example Caught |
+|----------|---------|----------------|
+| **Volume Paradox** | Catching impossible volume numbers for a given year | Citing Vol. 27 when journal is only at Vol. 23 |
+| **Sequential ID** | Detecting stolen e-IDs (e.g. Cureus) from old papers | Citing a 2025 paper with a 2020 article ID |
+| **Deep Metadata Compare** | Comparing cited title vs. actual DOI title | Real DOI leading to paper on Bladder Infections |
 
 ### 6-Tier Classification System
 
@@ -685,7 +693,8 @@ Export those top 5 articles to RIS format
 
 | Version | Features |
 |---------|----------|
-| **2.8.1** | PDF table filtering, actionable advice in reports, improved terminal/HTML output |
+| **3.1.0** | **Hallucination Hunter Update:** Added Volume Paradox logic, Sequential ID validation, and enhanced journal parsing. |
+| **3.0.0** | ABC-TOM intelligent fake citation detection with 6-tier classification, Grey Literature detection. |
 | **2.8.0** | Multi-source DOI verification (CrossRef, OpenAlex, Europe PMC), Frankenstein detection, 60% title similarity threshold, rapidfuzz integration |
 | **2.7.1** | Tiered confidence (DEFINITE_FAKE, LIKELY_VALID), field detection, APA 7th validation, DOI retry logic, manual verification links |
 | **2.7.0** | Reference Verification Tool - detect fake/AI-hallucinated citations in PDFs |
