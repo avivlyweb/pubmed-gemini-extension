@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for PubMed Gemini Extension GitHub Releases
+# Build script for Nagomi Clinical Forensic GitHub Releases
 # Creates a self-contained archive that works with:
 #   gemini extensions install github:avivlyweb/pubmed-gemini-extension
 #
@@ -13,7 +13,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RELEASE_DIR="$PROJECT_ROOT/release"
 ARCHIVE_NAME="pubmed-gemini.tar.gz"
 
-echo "Building PubMed Gemini Extension release..."
+echo "Building Nagomi Clinical Forensic release..."
 echo "Project root: $PROJECT_ROOT"
 
 # Clean previous build

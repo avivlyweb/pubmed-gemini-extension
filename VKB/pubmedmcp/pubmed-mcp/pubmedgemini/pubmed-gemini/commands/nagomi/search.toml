@@ -1,0 +1,16 @@
+prompt = """
+Please perform a rigorous analysis of this clinical inquiry and deliver a comprehensive evidence-weighted synthesis.
+
+Clinical Inquiry: {{args}}
+
+Utilize the enhanced_pubmed_search tool to identify high-integrity research, then subject the most authoritative articles to a detailed quality appraisal using the analyze_article_trustworthiness tool.
+
+Deliver your analysis structured as follows:
+1. **PICO Formulation**: Definitive breakdown of the clinical question.
+2. **Forensic Findings**: Synthesized evidence from high-tier (Grade A/B) literature.
+3. **Epistemic Certainty**: Assessment of evidence strength and methodological rigor.
+4. **Clinical Directives**: Actionable recommendations based on the findings.
+5. **Research Lacunae**: Identification of critical knowledge gaps and future scholarly trajectories.
+
+Maintain precision regarding study methodologies, cohort dimensions, and statistical thresholds.
+"""

@@ -1,0 +1,14 @@
+prompt = """
+Execute a forensic methodological appraisal and clinical relevance assessment of this scientific literature.
+
+Article Identifier (PMID): {{args}}
+
+Utilize the analyze_article_trustworthiness tool to evaluate:
+- **Taxonomic Hierarchy**: Study design and corresponding evidence level.
+- **Nagomi Trust Quotient**: Comprehensive quality metric and reliability rating.
+- **Methodological Vulnerabilities**: Appraisal of potential biases and rigorousness.
+- **Clinical Utility**: Translational implications and inherent limitations.
+- **Scholarly Contribution**: Integration within the broader epistemic landscape.
+
+Provide a critical deconstruction suitable for evidence-based clinical decision-making.
+"""

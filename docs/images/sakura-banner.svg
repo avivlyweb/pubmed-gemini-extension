@@ -1,37 +1,100 @@
 <svg width="1200" height="320" viewBox="0 0 1200 320" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="320" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#f8f5f2"/>
-      <stop offset="60%" stop-color="#f4eef1"/>
-      <stop offset="100%" stop-color="#f0f3f6"/>
+      <stop offset="0%" stop-color="#1a1520"/>
+      <stop offset="50%" stop-color="#1e1828"/>
+      <stop offset="100%" stop-color="#1a1a2e"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f4c2d7"/>
-      <stop offset="100%" stop-color="#f7d6c7"/>
+    <linearGradient id="sakura" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f4a0c0"/>
+      <stop offset="100%" stop-color="#e87da0"/>
     </linearGradient>
+    <linearGradient id="sakura2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7c4d8"/>
+      <stop offset="100%" stop-color="#f0a0c4"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
 
+  <!-- Background -->
   <rect width="1200" height="320" fill="url(#bg)"/>
 
-  <circle cx="95" cy="72" r="6" fill="url(#accent)"/>
-  <circle cx="120" cy="110" r="4" fill="url(#accent)"/>
-  <circle cx="180" cy="85" r="5" fill="url(#accent)"/>
-  <circle cx="240" cy="130" r="3" fill="url(#accent)"/>
+  <!-- Subtle horizontal line accents -->
+  <line x1="80" y1="260" x2="440" y2="260" stroke="#e87da0" stroke-width="0.5" opacity="0.15"/>
+  <line x1="760" y1="70" x2="1120" y2="70" stroke="#e87da0" stroke-width="0.5" opacity="0.15"/>
 
-  <circle cx="980" cy="220" r="6" fill="url(#accent)"/>
-  <circle cx="1030" cy="180" r="4" fill="url(#accent)"/>
-  <circle cx="1085" cy="235" r="5" fill="url(#accent)"/>
-  <circle cx="1120" cy="200" r="3" fill="url(#accent)"/>
+  <!-- Left sakura cluster -->
+  <circle cx="60" cy="55" r="8" fill="url(#sakura)" opacity="0.6" filter="url(#softglow)"/>
+  <circle cx="90" cy="85" r="5" fill="url(#sakura2)" opacity="0.4"/>
+  <circle cx="45" cy="100" r="6" fill="url(#sakura)" opacity="0.5"/>
+  <circle cx="110" cy="60" r="4" fill="url(#sakura2)" opacity="0.35"/>
+  <circle cx="75" cy="130" r="3.5" fill="url(#sakura)" opacity="0.3"/>
+  <circle cx="30" cy="75" r="3" fill="url(#sakura2)" opacity="0.25"/>
+  <circle cx="120" cy="110" r="4.5" fill="url(#sakura)" opacity="0.4"/>
 
-  <circle cx="520" cy="60" r="3" fill="#e9d7e2"/>
-  <circle cx="560" cy="86" r="2" fill="#e9d7e2"/>
-  <circle cx="600" cy="72" r="2.5" fill="#e9d7e2"/>
-  <circle cx="640" cy="96" r="2" fill="#e9d7e2"/>
+  <!-- Left bottom petals -->
+  <circle cx="50" cy="240" r="5" fill="url(#sakura2)" opacity="0.25"/>
+  <circle cx="80" cy="265" r="3.5" fill="url(#sakura)" opacity="0.2"/>
+  <circle cx="30" cy="270" r="4" fill="url(#sakura2)" opacity="0.15"/>
 
-  <text x="80" y="150" fill="#2a2a2a" font-family="Georgia, 'Times New Roman', serif" font-size="42" letter-spacing="0.2">
-    PubMed Gemini
+  <!-- Right sakura cluster -->
+  <circle cx="1120" cy="200" r="8" fill="url(#sakura)" opacity="0.6" filter="url(#softglow)"/>
+  <circle cx="1090" cy="230" r="5" fill="url(#sakura2)" opacity="0.4"/>
+  <circle cx="1145" cy="245" r="6" fill="url(#sakura)" opacity="0.5"/>
+  <circle cx="1070" cy="210" r="4" fill="url(#sakura2)" opacity="0.35"/>
+  <circle cx="1105" cy="265" r="3.5" fill="url(#sakura)" opacity="0.3"/>
+  <circle cx="1155" cy="220" r="3" fill="url(#sakura2)" opacity="0.25"/>
+  <circle cx="1060" cy="250" r="4.5" fill="url(#sakura)" opacity="0.4"/>
+
+  <!-- Right top petals -->
+  <circle cx="1130" cy="60" r="5" fill="url(#sakura2)" opacity="0.25"/>
+  <circle cx="1100" cy="45" r="3.5" fill="url(#sakura)" opacity="0.2"/>
+  <circle cx="1150" cy="80" r="4" fill="url(#sakura2)" opacity="0.15"/>
+
+  <!-- Scattered mid petals -->
+  <circle cx="500" cy="40" r="3" fill="url(#sakura2)" opacity="0.15"/>
+  <circle cx="650" cy="55" r="2.5" fill="url(#sakura)" opacity="0.12"/>
+  <circle cx="550" cy="280" r="2.5" fill="url(#sakura2)" opacity="0.12"/>
+  <circle cx="700" cy="270" r="3" fill="url(#sakura)" opacity="0.1"/>
+
+  <!-- Kanji watermark -->
+  <text x="880" y="200" fill="#e87da0" opacity="0.08" font-family="serif" font-size="180" font-weight="bold">和み</text>
+
+  <!-- Main title -->
+  <text x="100" y="125" fill="#f0e8ec" font-family="Georgia, 'Times New Roman', serif" font-size="44" letter-spacing="1" filter="url(#glow)">
+    Nagomi Clinical Forensic
   </text>
-  <text x="80" y="200" fill="#4a4a4a" font-family="Georgia, 'Times New Roman', serif" font-size="22" letter-spacing="0.2">
-    Research clarity, fast
+
+  <!-- Kanji inline -->
+  <text x="100" y="165" fill="#e87da0" font-family="serif" font-size="22" opacity="0.9">
+    和み
   </text>
+  <text x="150" y="165" fill="#a090a8" font-family="Georgia, 'Times New Roman', serif" font-size="18" letter-spacing="0.5">
+    — calm, balanced clarity in evidence
+  </text>
+
+  <!-- Subtitle -->
+  <text x="100" y="205" fill="#8a7a90" font-family="'Courier New', monospace" font-size="15" letter-spacing="0.5">
+    Forensic-grade research engine for Gemini CLI
+  </text>
+
+  <!-- Source badges -->
+  <rect x="100" y="230" width="82" height="26" rx="13" fill="#1e3a5f" stroke="#4a6a8f" stroke-width="0.8"/>
+  <text x="117" y="248" fill="#7abaed" font-family="system-ui, sans-serif" font-size="13" font-weight="500">PubMed</text>
+
+  <rect x="194" y="230" width="86" height="26" rx="13" fill="#1a3a2e" stroke="#3a7a5e" stroke-width="0.8"/>
+  <text x="210" y="248" fill="#5ac88e" font-family="system-ui, sans-serif" font-size="13" font-weight="500">CrossRef</text>
+
+  <rect x="292" y="230" width="92" height="26" rx="13" fill="#2a1a4a" stroke="#6a4a9a" stroke-width="0.8"/>
+  <text x="306" y="248" fill="#a080d0" font-family="system-ui, sans-serif" font-size="13" font-weight="500">OpenAlex</text>
+
+  <!-- Version -->
+  <text x="1100" y="300" fill="#5a4a60" font-family="'Courier New', monospace" font-size="13">v3.0.1</text>
 </svg>

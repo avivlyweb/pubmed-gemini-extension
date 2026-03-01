@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PubMed MCP Server - PhD-level medical research analysis
+Nagomi forensic server - PhD-level medical research analysis
 Standalone implementation compatible with Python 3.9+
 
 Provides tools for searching PubMed, analyzing article trustworthiness, 
@@ -4146,7 +4146,7 @@ class MCPServer:
                     },
                     "serverInfo": {
                         "name": "pubmed-research-mcp",
-                        "version": "2.7.0"
+                        "version": "3.0.1"
                     }
                 }
             elif method == "notifications/initialized":
@@ -4204,7 +4204,7 @@ class MCPServer:
     
     async def run(self):
         """Run the MCP server over stdio"""
-        print("PubMed MCP Server started", file=sys.stderr)
+        print("Nagomi forensic server started", file=sys.stderr)
         
         loop = asyncio.get_event_loop()
         reader = asyncio.StreamReader()

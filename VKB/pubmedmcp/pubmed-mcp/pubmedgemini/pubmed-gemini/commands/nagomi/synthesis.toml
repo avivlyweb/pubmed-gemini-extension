@@ -1,0 +1,48 @@
+prompt = """
+Synthesize a PhD-level comprehensive evidence-based report regarding this clinical domain.
+
+Topic: {{args}}
+
+Invoke the generate_research_summary tool to aggregate raw evidentiary data, then construct your synthesis utilizing the following rigorous architecture:
+
+# Nagomi Evidence Synthesis: {{args}}
+
+## Executive Evidence Summary
+**Verdict:** [Use evidence_compass.verdict] | **Epistemic Confidence:** [Use evidence_compass.confidence_level]
+[Provide a nuanced 3-sentence distillation of the evidentiary landscape, delineating the aggregate study volume and the prevailing consensus.]
+
+## PICO Structural Formulation
+- **Cohorts (P):** [Delineate the demographic and clinical characteristics from pico_analysis]
+- **Intervention Protocol (I):** [Synthesize the intervention parameters from pico_analysis]
+- **Comparative Baseline (C):** [Identify the comparators from pico_analysis]
+- **Primary Outcomes (O):** [Enumerate the salient endpoints documented in top_articles]
+
+## Statistical Deconstruction & Biomarker Correlation
+- **Biomarkers Identified:** [Scan top_articles for 'biomarkers' and enumerate them, e.g., BDNF, CTSB, Cortisol]
+- **Authoritative Findings:** [Synthesize the 'statement' and 'effect_size' from top_articles with specific emphasis on magnitude and statistical significance.]
+- **Mechanistic Insights:** [Elucidate the physiological pathways linking biomarkers to clinical manifestations based on study snapshots.]
+
+## Methodological Quality Audit
+| Investigation | Design | Evidence Grade | Trust Quotient | Salient Finding |
+| :--- | :--- | :--- | :--- | :--- |
+| [Author/Year] | [Design] | [Grade] | [Score]/100 | [Rigorous distillation of results] |
+*(Tabulate the top 5 articles from top_articles)*
+
+## Discrepancies & Conflicting Data
+[Utilize 'contradiction_analysis' to explain divergent outcomes through the lens of population heterogeneity, dosage variations, or temporal factors.]
+
+## Clinical Impact & Translational Utility
+- **Primary Beneficiaries:** [Identify subpopulations exhibiting maximum translational benefit]
+- **Optimal Parameters:** [Synthesize refined dosage, duration, and frequency guidelines]
+- **Clinical Significance (MCID):** [Differentiate between statistical p-values and minimal clinically important differences]
+
+## Safety Profile & Socioeconomic Equity
+- **Adverse Manifestations:** [Identify potential risks or contraindications]
+- **Health Equity Analysis:** [Address accessibility disparities and demographic representativeness using health_equity data]
+
+## Knowledge Lacunae
+- [List 2-3 critical research gaps identified in research_gaps]
+
+---
+*Evidentiary Sources: Comprehensive enumeration of PMIDs and DOIs subject to this forensic analysis.*
+"""

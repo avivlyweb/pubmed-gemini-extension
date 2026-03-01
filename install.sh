@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# PubMed Gemini Extension - One-Click Installer
+# Nagomi Clinical Forensic - One-Click Installer
 # For macOS and Linux - Installs ALL dependencies automatically!
 #
 # Usage (copy & paste this ONE line):
@@ -41,7 +41,7 @@ banner() {
     echo ""
     echo -e "${PURPLE}╔══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${PURPLE}║${NC}                                                              ${PURPLE}║${NC}"
-    echo -e "${PURPLE}║${NC}   ${DNA} ${BOLD}${CYAN}PubMed Gemini Extension${NC}                                ${PURPLE}║${NC}"
+    echo -e "${PURPLE}║${NC}   ${DNA} ${BOLD}${CYAN}Nagomi Clinical Forensic${NC}                                ${PURPLE}║${NC}"
     echo -e "${PURPLE}║${NC}   ${SEARCH} Medical Research AI for Gemini CLI                     ${PURPLE}║${NC}"
     echo -e "${PURPLE}║${NC}                                                              ${PURPLE}║${NC}"
     echo -e "${PURPLE}╚══════════════════════════════════════════════════════════════╝${NC}"
@@ -330,9 +330,9 @@ print_success() {
     echo ""
     echo -e "  ${BOLD}2.${NC} Try these commands:"
     echo ""
-    echo -e "     ${BLUE}/pubmed:search${NC} does yoga help anxiety"
-    echo -e "     ${BLUE}/pubmed:analyze${NC} 34580864"
-    echo -e "     ${BLUE}/pubmed:synthesis${NC} telemedicine for diabetes"
+    echo -e "     ${BLUE}/nagomi:search${NC} does yoga help anxiety"
+    echo -e "     ${BLUE}/nagomi:analyze${NC} 34580864"
+    echo -e "     ${BLUE}/nagomi:synthesis${NC} telemedicine for diabetes"
     echo ""
     echo -e "${CYAN}────────────────────────────────────────────────────────────────${NC}"
     echo -e "  ${BOLD}Installation:${NC} $INSTALL_DIR"
@@ -375,7 +375,7 @@ main() {
     step "Step 4/5: Python"
     python_cmd=$(ensure_python)
     
-    step "Step 5/5: PubMed Extension"
+    step "Step 5/5: Nagomi engine"
     setup_repository
     install_node_deps
     install_python_deps "$python_cmd"

@@ -1,0 +1,41 @@
+{
+  "name": "nagomi-clinical-forensic",
+  "version": "1.1.0",
+  "description": "Nagomi Clinical Forensic - Advanced Evidence-Based Research & Forensic Citation Verification",
+  "type": "module",
+  "main": "pubmed-wrapper.js",
+  "scripts": {
+    "build": "tsc",
+    "package": "npm run build && npm pack",
+    "test": "node pubmed-wrapper.js --test"
+  },
+  "devDependencies": {
+    "typescript": "~5.4.5",
+    "@types/node": "^20.11.25"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0",
+    "zod": "^3.22.4"
+  },
+  "keywords": [
+    "nagomi",
+    "clinical-forensic",
+    "medical-research",
+    "evidence-based-medicine",
+    "citation-verification",
+    "ai-synthesis",
+    "mcp-server",
+    "gemini-cli-extension"
+  ],
+  "author": "Nagomi Research Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/avivlyweb/pubmed-gemini-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/avivlyweb/pubmed-gemini-extension/issues"
+  },
+  "homepage": "https://github.com/avivlyweb/pubmed-gemini-extension#readme",
+  "types": "./example.d.ts"
+}

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the **PubMed Gemini Extension** will be documented in this file.
+All notable changes to the **Nagomi Clinical Forensic** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -141,7 +141,7 @@ Detect fake/AI-hallucinated references in academic papers and validate APA forma
   - HTML: Professional styled report
   - PDF: Via HTML conversion (optional)
 
-- **`/pubmed:verify` Slash Command**: Quick access to verification
+- **`/nagomi:verify` Slash Command**: Quick access to verification
 
 ### Technical
 - Added `reference_checker/` module with 5 components:
@@ -253,7 +253,7 @@ A new feature that goes beyond simple "consensus meters" by weighting evidence b
 ### Technical
 - Added `EvidenceCompass` class (~400 lines)
 - Added `EvidenceCompassResult` dataclass
-- Integrated with `ResearchSynthesizer` for `/pubmed:synthesis` command
+- Integrated with `ResearchSynthesizer` for `/nagomi:synthesis` command
 - Updated test suite with Evidence Compass validation
 
 ---
@@ -314,7 +314,7 @@ A new feature that goes beyond simple "consensus meters" by weighting evidence b
 
 ### Added
 - **Core MCP Server**: Node.js wrapper for Python PubMed analysis engine
-- **Custom Commands**: `/pubmed:search`, `/pubmed:analyze`, `/pubmed:synthesis`
+- **Custom Commands**: `/nagomi:search`, `/nagomi:analyze`, `/nagomi:synthesis`
 - **Medical Research Tools**:
   - Enhanced PubMed search with query optimization
   - Article trustworthiness analysis (0-100 trust scores)

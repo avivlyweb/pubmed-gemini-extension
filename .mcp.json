@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "pubmed": {
+      "command": "./pubmed-mcp/venv/bin/python3",
+      "args": [
+        "./pubmed-mcp/pubmed_mcp.py"
+      ]
+    }
+  }
+}

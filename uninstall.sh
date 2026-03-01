@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# PubMed Gemini Extension - Uninstaller
+# Nagomi Clinical Forensic - Uninstaller
 #
 # Usage: curl -fsSL https://raw.githubusercontent.com/avivlyweb/pubmed-gemini-extension/main/uninstall.sh | bash
 #
@@ -18,7 +18,7 @@ INSTALL_DIR="$HOME/.pubmed-gemini-extension"
 EXT_LINK="$HOME/.gemini/extensions/pubmed-gemini"
 
 echo ""
-echo -e "${CYAN}PubMed Gemini Extension - Uninstaller${NC}"
+echo -e "${CYAN}Nagomi Clinical Forensic - Uninstaller${NC}"
 echo "======================================"
 echo ""
 
