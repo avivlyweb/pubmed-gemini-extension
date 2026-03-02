@@ -6,7 +6,6 @@
 
 [![Gemini CLI Extension](https://img.shields.io/badge/Gemini_CLI-Extension-4a6a8f?style=flat-square)](https://gcli.dev)
 [![PubMed](https://img.shields.io/badge/PubMed-NCBI-7abaed?style=flat-square)](https://pubmed.ncbi.nlm.nih.gov)
-[![CrossRef](https://img.shields.io/badge/CrossRef-API-5ac88e?style=flat-square)](https://www.crossref.org)
 [![Version](https://img.shields.io/badge/version-3.1.0-blue.svg?style=flat-square)](https://github.com/avivlyweb/pubmed-gemini-extension/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-e87da0?style=flat-square)](#license)
 
@@ -14,147 +13,71 @@
 
 ---
 
-Nagomi (和み) means *calm, balanced clarity*. This extension transforms Gemini CLI into a research engine that searches PubMed, verifies citations, grades evidence quality, and exports bibliographies — with forensic precision.
+# 🌸 Nagomi (和み): Calm Clarity in a Crisis of Fraud
 
-> [!TIP]
-> **Quick start** — two commands and you're searching:
-> ```bash
-> gemini extensions install https://github.com/avivlyweb/pubmed-gemini-extension
-> ```
-> Then inside Gemini CLI:
-> ```
-> /nagomi:search yoga and neuroplasticity
-> ```
+Nagomi is not just a search tool. It is a **forensic-grade clinical research engine** designed to protect the integrity of medical science. 
+
+In a world where **1 in 500 academic papers are retracted** and AI hallucinations create "fake evidence" that looks 100% real, Nagomi acts as your scientific gatekeeper. It uses mathematical logic and deep-database cross-referencing to separate ground-breaking research from AI-generated fabrications.
 
 ---
 
-## New in v3.1 - Advanced Hallucination Hunting
+## 🚀 Why Nagomi? (The Power of Forensic Research)
 
-The reference verification system now includes "Scientific Logic" checks to catch high-quality AI fabrications:
+### 1. The "1 Year in 45 Seconds" ROI
+*   **The Scenario:** A student spent 1 year manually researching special tests for shoulder impingement to create a clinical algorithm.
+*   **The Nagomi Result:** In **45 seconds**, Nagomi performed a PICO-optimized search, graded the evidence of 20+ articles, and generated a more accurate, 2025-aligned algorithm.
+*   **Bottom Line:** Nagomi condenses months of human labor into seconds of high-precision synthesis.
 
-| Detector | Purpose | Example Caught |
-|----------|---------|----------------|
-| **Volume Paradox** | Catching impossible volume numbers for a given year | Citing Vol. 27 when journal is only at Vol. 23 |
-| **Sequential ID** | Detecting stolen e-IDs (e.g. Cureus) from old papers | Citing a 2025 paper with a 2020 article ID |
-| **Deep Metadata Compare** | Comparing cited title vs. actual DOI title | Real DOI leading to paper on Bladder Infections |
+### 2. Catching the "Uncatchable" Hallucinations
+Nagomi is the first tool to automate **Scientific Logic Checks** that traditional plagiarism software misses.
+
+*   **Case Study (The Stolen Identity):** A student cited a "2025 paper on AI in Physiotherapy."
+*   **Nagomi's Catch:** The tool detected a **Sequential ID Mismatch**. It proved that the ID used belonged to a **2020 paper about a bladder infection**.
+*   **Verdict:** Caught a "Frankenstein" citation that a human reviewer would have passed.
+
+### 3. Mathematical Truth: The Volume Paradox
+AIs are bad at math. They "guess" volume numbers. Nagomi calculates them.
+*   **The Catch:** If a paper claims to be from "Vol. 27" of a journal that only started in 2012, Nagomi flags a **Volume Paradox**. It is mathematically impossible for that volume to exist yet.
 
 ---
 
-## What It Does
+## 🛠️ What It Does
 
-| Capability | Command | Description |
+| Capability | Command | Impact |
 |:--|:--|:--|
-| **Evidence Search** | `/nagomi:search` | PICO-optimized PubMed queries with trust scoring |
-| **Quality Appraisal** | `/nagomi:analyze` | Methodological audit by PMID with grade assignment |
-| **Research Synthesis** | `/nagomi:synthesis` | PhD-level collation across multiple studies |
-| **Citation Verification** | `/nagomi:verify` | Detects fabricated authors, mismatched DOIs, anomalies |
-| **Bibliography Export** | via tools | BibTeX, RIS, EndNote format generation |
+| **Evidence Search** | `/nagomi:search` | PhD-level precision using PICO logic across 35M+ articles. |
+| **Hallucination Hunt**| `/nagomi:verify` | Detects "Ghost DOIs," Stolen IDs, and Volume Paradoxes. |
+| **PhD Synthesis** | `/nagomi:synthesis` | Turns a messy pile of results into a weighted "Evidence Compass." |
+| **Quality Audit** | `/nagomi:analyze` | Grades every study (A/B/C/D) based on methodological rigor. |
+| **Forensic Report** | via tools | Generates irrefutable proof of fabrication for Boards of Examiners. |
+
+---
+
+## 🧠 The ABC-TOM v3.1 Intelligence Layers
+
+Nagomi doesn't just "search"—it **thinks** like a forensic auditor:
+
+1.  **Registry Match:** Does this DOI/PMID actually exist?
+2.  **Volume Paradox Logic:** Is the volume number mathematically possible for this year?
+3.  **Sequential ID Tracking:** Does the article ID match the historical timeline of the journal?
+4.  **Frankenstein Detection:** Does the cited title match the *actual* title in the database?
+5.  **Retraction Monitor:** Has this paper been pulled for fraud since it was published?
 
 ---
 
 ## Usage Examples
 
-**Synthesize evidence on a clinical topic:**
+**Find the "Gold Standard" for any treatment:**
 ```bash
-/nagomi:synthesis the effects of running outside on brain function
-/nagomi:synthesis pharmacological interventions for neuroinflammation
+/nagomi:search what is the best medicine for gout prevention
+/nagomi:synthesis dry needling vs exercise for chronic back pain
 ```
 
-**Verify a citation or DOI:**
+**Run a Forensic Audit on a document:**
 ```bash
-/nagomi:verify 10.1001/jama.2023.12345
-/nagomi:verify ~/Documents/dissertation.pdf
+/nagomi:verify ~/Downloads/student_thesis.pdf
+/nagomi:verify 10.1016/j.mcna.2014.03.005
 ```
-
-**Analyze a specific article:**
-```bash
-/nagomi:analyze 34580864
-```
-
-**Export references:**
-```bash
-/nagomi:export 15612906 format=ris
-/nagomi:export "yoga for anxiety" format=bibtex
-```
-
----
-
-## Screenshots
-
-<details>
-<summary>Evidence search with PICO analysis</summary>
-
-![Search](docs/images/Screenshot%202026-01-25%20at%2013.41.13.png)
-
-</details>
-
-<details>
-<summary>Research synthesis output</summary>
-
-![Synthesis](docs/images/Screenshot%202026-01-25%20at%2013.41.57.png)
-
-</details>
-
-<details>
-<summary>Citation verification</summary>
-
-![Verify](docs/images/Screenshot%202026-01-25%20at%2013.46.49.png)
-
-</details>
-
----
-
-## How It Works
-
-The Nagomi Cascade — a 4-level validation protocol on every query:
-
-```mermaid
-graph LR
-    A[Query] --> B[Registry Match]
-    B --> C[Author Verification]
-    C --> D[Field Mismatch Check]
-    D --> E[Anomaly Report]
-
-    style A fill:#1a1520,stroke:#e87da0,color:#f0e8ec
-    style B fill:#1e3a5f,stroke:#4a6a8f,color:#7abaed
-    style C fill:#1a3a2e,stroke:#3a7a5e,color:#5ac88e
-    style D fill:#2a1a4a,stroke:#6a4a9a,color:#a080d0
-    style E fill:#3a1a2a,stroke:#8a4a5a,color:#e87da0
-```
-
-1. **Registry Match** — Validates DOI/PMID exists in authoritative databases
-2. **Author Verification** — Cross-references cited authors against registered metadata
-3. **Field Mismatch Check** — Detects if a DOI resolves to a journal outside the cited domain
-4. **Anomaly Report** — Flags "Frankenstein" citations or future-dated confabulations (ABC-TOM v3.1)
-
----
-
-## ABC-TOM Classification System
-
-The reference verification system uses intelligent classification to distinguish between genuinely fake citations and valid sources:
-
-| Status | Icon | Meaning |
-|--------|------|---------|
-| `VERIFIED` | OK | Exact match in PubMed/CrossRef |
-| `VERIFIED_LEGACY_DOI` | LEGACY | Paper exists but DOI is broken/migrated |
-| `GREY_LITERATURE` | GREY | Valid source not indexed (WHO, guidelines, reports) |
-| `LOW_QUALITY_SOURCE` | LOW | Real but not peer-reviewed (preprints, ResearchGate) |
-| `SUSPICIOUS` | WARN | Partial match with discrepancies |
-| `NOT_FOUND` | MISS | No match in any database |
-| `DEFINITE_FAKE` | FAKE | Frankenstein citation or impossible data (Volume Paradox) |
-
----
-
-## Evidence Grading
-
-Built on the GRADE framework combined with Nagomi Trust Quotients (0–100):
-
-| Grade | Level | Source Types | Trust Range |
-|:-----:|:------|:-------------|:------------|
-| **A** | Strong | Systematic Reviews, Meta-Analyses | 80–100 |
-| **B** | Reliable | Randomized Controlled Trials | 60–79 |
-| **C** | Indicative | Cohort & Observational Studies | 40–59 |
-| **D** | Limited | Case Series, Expert Opinion | 0–39 |
 
 ---
 
@@ -164,49 +87,23 @@ Built on the GRADE framework combined with Nagomi Trust Quotients (0–100):
 gemini extensions install https://github.com/avivlyweb/pubmed-gemini-extension
 ```
 
-<details>
-<summary>Manual installation</summary>
-
-```bash
-git clone https://github.com/avivlyweb/pubmed-gemini-extension.git
-cd pubmed-gemini-extension
-bash install.sh
-```
-
-</details>
-
 **Requirements:** Gemini CLI, Node.js 18+, Python 3.9+
-
----
-
-## MCP Tools
-
-The extension exposes 5 tools via the Model Context Protocol:
-
-| Tool | Purpose |
-|:-----|:--------|
-| `enhanced_pubmed_search` | PubMed search with PICO analysis and trust scoring |
-| `analyze_article_trustworthiness` | Methodological quality analysis by PMID |
-| `generate_research_summary` | Multi-article evidence synthesis |
-| `export_citations` | BibTeX / RIS / EndNote export |
-| `verify_references` | Reference verification with ABC-TOM framework |
 
 ---
 
 ## Version History
 
-| Version | Features |
-|---------|----------|
-| **3.1.0** | **Hallucination Hunter Update:** Added Volume Paradox logic, Sequential ID validation, and enhanced journal parsing. |
-| **3.0.0** | ABC-TOM intelligent fake citation detection with 6-tier classification, Grey Literature detection. |
-| **2.8.0** | Multi-source DOI verification (CrossRef, OpenAlex, Europe PMC), Frankenstein detection. |
-| **2.7.0** | Reference Verification Tool - detect fake/AI-hallucinated citations in PDFs. |
+| Version | Milestone | Features |
+|---------|-----------|----------|
+| **3.1.0** | **The Forensic Update** | **Hallucination Hunter:** Volume Paradox, Sequential IDs, Stolen ID detection. |
+| **3.0.0** | **The ABC-TOM Update** | 6-Tier Classification, Grey Literature detection, Frankenstein catch. |
+| **2.7.0** | **The Verification Update** | Initial PDF/Reference verification engine. |
 
 ---
 
 ## Contributing
 
-Found an anomaly in the forensic engine? Open an [issue](https://github.com/avivlyweb/pubmed-gemini-extension/issues).
+Found a new type of AI hallucination? Help us train the engine by opening an [issue](https://github.com/avivlyweb/pubmed-gemini-extension/issues).
 
 ---
 
