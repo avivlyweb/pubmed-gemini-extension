@@ -23,33 +23,28 @@ In a world where **1 in 500 academic papers are retracted** and AI hallucination
 
 ## 🚀 Why Nagomi? (The Power of Forensic Research)
 
-### 1. The "1 Year in 45 Seconds" ROI
-*   **The Scenario:** A student spent 1 year manually researching special tests for shoulder impingement to create a clinical algorithm.
-*   **The Nagomi Result:** In **45 seconds**, Nagomi performed a PICO-optimized search, graded the evidence of 20+ articles, and generated a more accurate, 2025-aligned algorithm.
-*   **Bottom Line:** Nagomi condenses months of human labor into seconds of high-precision synthesis.
+### ⚡ 1 Year of Research in 45 Seconds
+*   **The Scenario:** A student spent a full year manually researching diagnostic clusters for shoulder impingement.
+*   **The Nagomi Result:** In **45 seconds**, Nagomi performed a PICO-optimized search, audited the methodology of 20+ articles, and generated a more accurate, 2025-aligned clinical algorithm.
+*   **Impact:** Massive ROI for clinicians and students who need "Gold Standard" answers without the manual labor.
 
-### 2. Catching the "Uncatchable" Hallucinations
-Nagomi is the first tool to automate **Scientific Logic Checks** that traditional plagiarism software misses.
-
-*   **Case Study (The Stolen Identity):** A student cited a "2025 paper on AI in Physiotherapy."
-*   **Nagomi's Catch:** The tool detected a **Sequential ID Mismatch**. It proved that the ID used belonged to a **2020 paper about a bladder infection**.
-*   **Verdict:** Caught a "Frankenstein" citation that a human reviewer would have passed.
-
-### 3. Mathematical Truth: The Volume Paradox
-AIs are bad at math. They "guess" volume numbers. Nagomi calculates them.
-*   **The Catch:** If a paper claims to be from "Vol. 27" of a journal that only started in 2012, Nagomi flags a **Volume Paradox**. It is mathematically impossible for that volume to exist yet.
+### 🕵️‍♂️ Catching "Uncatchable" AI Hallucinations
+Nagomi automates scientific logic checks that standard plagiarism tools miss.
+*   **The Case:** Detected a **Sequential ID Mismatch** in a student paper.
+*   **The Proof:** Proved a cited "2025 AI Study" was actually using an ID from a **2020 paper about bladder infections**.
+*   **Impact:** Absolute protection for academic integrity and degree quality control.
 
 ---
 
-## 🛠️ What It Does
+## 🛠️ The Clinical Research Suite
 
-| Capability | Command | Impact |
+| Command | Capability | The Nagomi "Superpower" |
 |:--|:--|:--|
-| **Evidence Search** | `/nagomi:search` | PhD-level precision using PICO logic across 35M+ articles. |
-| **Hallucination Hunt**| `/nagomi:verify` | Detects "Ghost DOIs," Stolen IDs, and Volume Paradoxes. |
-| **PhD Synthesis** | `/nagomi:synthesis` | Turns a messy pile of results into a weighted "Evidence Compass." |
-| **Quality Audit** | `/nagomi:analyze` | Grades every study (A/B/C/D) based on methodological rigor. |
-| **Forensic Report** | via tools | Generates irrefutable proof of fabrication for Boards of Examiners. |
+| **`/nagomi:search`** | **PICO-Optimized Search** | Doesn't just find keywords. It extracts **Population, Intervention, Comparison, and Outcome** to find the exact clinical "DNA" of your question. |
+| **`/nagomi:synthesis`**| **PhD-Level Collation** | Collates dozens of studies into a weighted **Evidence Compass**. It tells you not just *what* was found, but *how much you should trust it*. |
+| **`/nagomi:verify`** | **Hallucination Hunter** | Scans PDFs/DOIs for **Volume Paradoxes** and **Stolen IDs**. Catch fabrication before it enters your bibliography. |
+| **`/nagomi:analyze`** | **Methodological Audit** | Performs a deep-dive on a single PMID. Grades it **A to D** based on sample size, study design, and risk of bias. |
+| **`/nagomi:export`** | **Seamless Integration** | Instant export to **BibTeX or RIS**. Connects your research directly to Zotero, Mendeley, or LaTeX. |
 
 ---
 
@@ -57,26 +52,32 @@ AIs are bad at math. They "guess" volume numbers. Nagomi calculates them.
 
 Nagomi doesn't just "search"—it **thinks** like a forensic auditor:
 
-1.  **Registry Match:** Does this DOI/PMID actually exist?
-2.  **Volume Paradox Logic:** Is the volume number mathematically possible for this year?
-3.  **Sequential ID Tracking:** Does the article ID match the historical timeline of the journal?
-4.  **Frankenstein Detection:** Does the cited title match the *actual* title in the database?
-5.  **Retraction Monitor:** Has this paper been pulled for fraud since it was published?
+1.  **PICO Translation:** Automatically converts casual questions (e.g., "best gout meds") into precise clinical search strings.
+2.  **Evidence Compass:** A visual weighted verdict that correctly favors Grade A Systematic Reviews over anecdotal Case Reports.
+3.  **Volume Paradox Logic:** Identifies "Frankenstein" citations where the volume number is mathematically impossible for the cited year.
+4.  **Sequential ID Tracking:** Detects when an AI reuses real article IDs from old papers to mask fake new titles.
+5.  **Retraction Monitor:** Alerts you if a paper in your list has been officially pulled for fraud since its publication.
 
 ---
 
 ## Usage Examples
 
-**Find the "Gold Standard" for any treatment:**
+**For Clinicians: Find the "Best" Treatment**
 ```bash
-/nagomi:search what is the best medicine for gout prevention
-/nagomi:synthesis dry needling vs exercise for chronic back pain
+/nagomi:search what is the most effective treatment for Achilles tendinopathy
+/nagomi:synthesis yoga vs meditation for neuroplasticity in seniors
 ```
 
-**Run a Forensic Audit on a document:**
+**For Professors: Audit Academic Integrity**
 ```bash
-/nagomi:verify ~/Downloads/student_thesis.pdf
+/nagomi:verify ~/Downloads/final_submission.pdf
 /nagomi:verify 10.1016/j.mcna.2014.03.005
+```
+
+**For Researchers: Deep-Dive and Export**
+```bash
+/nagomi:analyze 34580864
+/nagomi:export "chronic heart failure telemonitoring" format=bibtex
 ```
 
 ---
@@ -95,15 +96,9 @@ gemini extensions install https://github.com/avivlyweb/pubmed-gemini-extension
 
 | Version | Milestone | Features |
 |---------|-----------|----------|
-| **3.1.0** | **The Forensic Update** | **Hallucination Hunter:** Volume Paradox, Sequential IDs, Stolen ID detection. |
-| **3.0.0** | **The ABC-TOM Update** | 6-Tier Classification, Grey Literature detection, Frankenstein catch. |
-| **2.7.0** | **The Verification Update** | Initial PDF/Reference verification engine. |
-
----
-
-## Contributing
-
-Found a new type of AI hallucination? Help us train the engine by opening an [issue](https://github.com/avivlyweb/pubmed-gemini-extension/issues).
+| **3.1.0** | **The Forensic Update** | Volume Paradox, Sequential IDs, Renamed to Nagomi. |
+| **3.0.0** | **The ABC-TOM Update** | 6-Tier Classification, Grey Literature detection. |
+| **2.5.0** | **The Evidence Update** | Evidence Compass, PICO logic, Weighted Verdicts. |
 
 ---
 
