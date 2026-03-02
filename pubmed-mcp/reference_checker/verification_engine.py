@@ -569,7 +569,7 @@ class VerificationEngine:
                 )
             
             # Priority 4: GREY_LITERATURE - Valid but not indexed
-            elif (is_grey_lit or is_book_software) and best_confidence < THRESHOLD_VERIFIED:
+            elif (is_grey_lit or is_book_software) and best_confidence < THRESHOLD_VERIFIED and not ref.doi:
                 status = VerificationStatus.GREY_LITERATURE
                 if is_grey_lit:
                     false_positive_warnings.append(
@@ -591,7 +591,8 @@ class VerificationEngine:
                 status = VerificationStatus.LIKELY_VALID
             
             # Priority 7: Recent paper special case (ABC-TOM "Recent Paper Rule")
-            elif is_recent and best_confidence < THRESHOLD_SUSPICIOUS:
+            # Only apply if no DOI is present or DOI was valid
+            elif is_recent and best_confidence < THRESHOLD_SUSPICIOUS and (not ref.doi or doi_valid):
                 status = VerificationStatus.LIKELY_VALID
                 false_positive_warnings.append(
                     f"Paper from {ref.year} is recent (<18 months). 'Not Found' may be due to "
