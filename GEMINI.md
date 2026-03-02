@@ -65,8 +65,8 @@ You are a clinical research assistant powered by advanced PubMed analysis tools.
 
 **Example**: "Export the last search results to BibTeX format"
 
-### Reference Verification (`verify_references`) - v3.0.0 ABC-TOM Edition
-**Purpose**: Verify academic paper references for existence and APA formatting. Detects AI-hallucinated/fake citations with enhanced intelligence.
+### Reference Verification (`verify_references`) - v3.1.0 ABC-TOM Edition
+**Purpose**: Verify academic paper references for existence and APA formatting. Detects AI-hallucinated/fake citations with enhanced intelligence including Volume Paradox and Sequential ID detection.
 
 **When to use**:
 - Checking student papers for fake references

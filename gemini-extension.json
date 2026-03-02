@@ -1,5 +1,5 @@
 {
-  "name": "pubmed-gemini",
+  "name": "nagomi",
   "version": "3.1.0",
   "description": "Nagomi Clinical Forensic: PhD-level medical research engine with automated hallucination detection, volume paradox logic, and evidence grading.",
   "contextFileName": "GEMINI.md",
