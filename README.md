@@ -21,6 +21,20 @@ In a world where **1 in 500 academic papers are retracted** and AI hallucination
 
 ---
 
+## 🎬 See It In Action
+
+<div align="center">
+
+<video src="docs/media/nagomi-demo.mp4" controls autoplay loop muted width="100%">
+  <a href="docs/media/nagomi-demo.mp4">▶ Watch the Nagomi demo (26s)</a>
+</video>
+
+*26 seconds · PICO search · forensic detection · 5 commands · ABC-TOM v3.1*
+
+</div>
+
+---
+
 ## 🚀 Why Nagomi? (The Power of Forensic Research)
 
 ### ⚡ 1 Year of Research in 45 Seconds
