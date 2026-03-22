@@ -25,8 +25,8 @@ In a world where **1 in 500 academic papers are retracted** and AI hallucination
 
 <div align="center">
 
-<video src="docs/media/nagomi-demo.mp4" controls autoplay loop muted width="100%">
-  <a href="docs/media/nagomi-demo.mp4">▶ Watch the Nagomi demo (26s)</a>
+<video src="https://github.com/avivlyweb/pubmed-gemini-extension/releases/download/v3.1.0-demo/nagomi-demo.mp4" controls autoplay loop muted width="100%">
+  <a href="https://github.com/avivlyweb/pubmed-gemini-extension/releases/download/v3.1.0-demo/nagomi-demo.mp4">▶ Watch the Nagomi demo (26s)</a>
 </video>
 
 *26 seconds · PICO search · forensic detection · 5 commands · ABC-TOM v3.1*
